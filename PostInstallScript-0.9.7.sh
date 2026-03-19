@@ -2,6 +2,7 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
+iteration="0.9.7"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
@@ -15,6 +16,9 @@ glfw glew extra-cmake-modules
 
 # set: export GCM_CREDENTIAL_STORE=secretservice
 # for sourcegit be able to log in into your account
+
+# git config --global user.email "email@gmail.com"
+# git config --global user.name "BrandowLucas"
 
 pentest_packages=(
 wireshark-qt whois gnu-netcat nmap traceroute
@@ -123,7 +127,7 @@ YELLOW='\033[38;5;226m'
 
 logo() {
     echo -e ""
-    echo -e "${BOLD}EOS Post install script ver 0.9.7${NC}"
+    echo -e "${BOLD}EOS Post install script ver ${iteration}${NC}"
     echo -e "By ${UNDERLINE}https://github.com/BrandowLucas${NC}"
     echo -e ""
 }
