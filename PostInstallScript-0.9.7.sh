@@ -761,21 +761,28 @@ update_grub_zswap() {
     local parameter="GRUB_CMDLINE_LINUX_DEFAULT"
 
     if [ -f "$grub_config" ]; then
-        # Check if parameters are already present
-        if grep -q "$zswap_params" "$grub_config"; then
+        # Check if parameters are already present and match exactly what we want
+        if grep -q "zswap.enabled=1" "$grub_config" && grep -q "zswap.compressor=$1" "$grub_config"; then
             echo "GRUB parameters are already set."
         else
-            # Ensure zswap parameters are not duplicated
-            local current_params=$(grep "^${parameter}=" "$grub_config" | sed "s/^${parameter}=\"//;s/\"$//")
+            # Ensure zswap parameters are not duplicated and remove any existing ones
+            sudo sed -i "s/zswap\.enabled=[^ \"']* //g; s/zswap\.enabled=[^ \"']*//g" "$grub_config"
+            sudo sed -i "s/zswap\.compressor=[^ \"']* //g; s/zswap\.compressor=[^ \"']*//g" "$grub_config"
+            sudo sed -i "s/zswap\.max_pool_percent=[^ \"']* //g; s/zswap\.max_pool_percent=[^ \"']*//g" "$grub_config"
+            sudo sed -i "s/zswap\.zpool=[^ \"']* //g; s/zswap\.zpool=[^ \"']*//g" "$grub_config"
 
-            if [[ "$current_params" == *"zswap.enabled=1"* ]]; then
-                echo "GRUB parameters are already set."
-            else
-                # Append parameters to GRUB_CMDLINE_LINUX_DEFAULT
-                sudo sed -i "s/^${parameter}=\"/&$zswap_params /" "$grub_config"
-                sudo update-grub > /dev/null 2>&1
-                echo "GRUB parameters updated and grub configuration regenerated."
+            # Prepend parameters to GRUB_CMDLINE_LINUX_DEFAULT, supporting both " and '
+            if grep -q "^${parameter}=\"" "$grub_config"; then
+                sudo sed -i "s/^${parameter}=\"/&${zswap_params} /" "$grub_config"
+            elif grep -q "^${parameter}='" "$grub_config"; then
+                sudo sed -i "s/^${parameter}='/&${zswap_params} /" "$grub_config"
             fi
+            
+            # Cleanup double spaces if any
+            sudo sed -i "s/  / /g" "$grub_config"
+
+            sudo update-grub > /dev/null 2>&1
+            echo "GRUB parameters updated and grub configuration regenerated."
         fi
     else
         echo "$grub_config does not exist. Skipping GRUB update..."
@@ -794,14 +801,18 @@ update_systemdboot_zswap() {
         sudo cp /etc/kernel/cmdline /etc/kernel/cmdline.bak
 
         # Remove any existing Zswap parameters and extra spaces
-        sudo sed -i "/zswap.enabled=1/d" /etc/kernel/cmdline
-        sudo sed -i "/zswap.compressor=[^ ]*/d" /etc/kernel/cmdline
-        sudo sed -i "/zswap.max_pool_percent=[^ ]*/d" /etc/kernel/cmdline
-        sudo sed -i "/zswap.zpool=[^ ]*/d" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.enabled=[^ ]* //g; s/zswap\.enabled=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.compressor=[^ ]* //g; s/zswap\.compressor=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.max_pool_percent=[^ ]* //g; s/zswap\.max_pool_percent=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.zpool=[^ ]* //g; s/zswap\.zpool=[^ ]*$//g" /etc/kernel/cmdline
 
         # Append the new parameters
-        if ! grep -q "$zswap_params" /etc/kernel/cmdline; then
-            echo -n " $zswap_params" | sudo tee -a /etc/kernel/cmdline > /dev/null
+        if ! grep -q "zswap.enabled=1" /etc/kernel/cmdline; then
+            if [ -s /etc/kernel/cmdline ]; then
+                echo -n " $zswap_params" | sudo tee -a /etc/kernel/cmdline > /dev/null
+            else
+                echo -n "$zswap_params" | sudo tee -a /etc/kernel/cmdline > /dev/null
+            fi
             echo "Updated /etc/kernel/cmdline with new parameters."
         else
             echo "Parameters already present in /etc/kernel/cmdline."
@@ -874,16 +885,24 @@ configure_swap() {
 disable_zswap() {
     echo "Disabling zswap..."
 
-    # Remove zswap parameters from the /etc/kernel/cmdline file
+    # Check for systemd-boot
     if [ -f /etc/kernel/cmdline ]; then
-        sudo sed -i 's/zswap.enabled=1 //g' /etc/kernel/cmdline
-        sudo sed -i 's/zswap.compressor=[^ ]* //g' /etc/kernel/cmdline
-        sudo sed -i 's/zswap.max_pool_percent=[^ ]* //g' /etc/kernel/cmdline
-        sudo sed -i 's/zswap.zpool=[^ ]* //g' /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.enabled=[^ ]* //g; s/zswap\.enabled=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.compressor=[^ ]* //g; s/zswap\.compressor=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.max_pool_percent=[^ ]* //g; s/zswap\.max_pool_percent=[^ ]*$//g" /etc/kernel/cmdline
+        sudo sed -i "s/zswap\.zpool=[^ ]* //g; s/zswap\.zpool=[^ ]*$//g" /etc/kernel/cmdline
         sudo kernel-install add $(uname -r) /boot/vmlinuz-$(uname -r)
         echo "Systemd-boot parameters updated."
+    # Check for GRUB
+    elif [ -f /etc/default/grub ]; then
+        sudo sed -i "s/zswap\.enabled=[^ \"']* //g; s/zswap\.enabled=[^ \"']*//g" /etc/default/grub
+        sudo sed -i "s/zswap\.compressor=[^ \"']* //g; s/zswap\.compressor=[^ \"']*//g" /etc/default/grub
+        sudo sed -i "s/zswap\.max_pool_percent=[^ \"']* //g; s/zswap\.max_pool_percent=[^ \"']*//g" /etc/default/grub
+        sudo sed -i "s/zswap\.zpool=[^ \"']* //g; s/zswap\.zpool=[^ \"']*//g" /etc/default/grub
+        sudo update-grub > /dev/null 2>&1
+        echo "GRUB parameters updated and grub configuration regenerated."
     else
-        echo "File /etc/kernel/cmdline does not exist. Cannot disable zswap."
+        echo "Neither /etc/kernel/cmdline nor /etc/default/grub found. Cannot disable zswap."
         return 1
     fi
 }
@@ -918,7 +937,7 @@ z_memory() {
     case "$choice" in
         1)
             # Disable Zswap if active
-            if sudo grep -q "zswap.enabled=1" /etc/kernel/cmdline 2>/dev/null; then
+            if sudo grep -q "zswap.enabled=1" /etc/kernel/cmdline 2>/dev/null || sudo grep -q "zswap.enabled=1" /etc/default/grub 2>/dev/null; then
                 disable_zswap
             fi
 
@@ -970,11 +989,16 @@ z_memory() {
                     ;;
             esac
 
-            # Update /etc/kernel/cmdline with Zswap parameters
-            update_systemdboot_zswap "$zswap_compressor"
-
-            # Configure swap file
-            configure_swap
+            # Update bootloader with Zswap parameters
+            if [ -f /etc/kernel/cmdline ]; then
+                update_systemdboot_zswap "$zswap_compressor"
+                configure_swap
+            elif [ -f /etc/default/grub ]; then
+                update_grub_zswap "$zswap_compressor"
+                configure_swap
+            else
+                echo -e "${RED}Neither /etc/kernel/cmdline nor /etc/default/grub found. Skipping bootloader update...${NC}"
+            fi
             ;;
         *)
             echo -e "${YELLOW}Invalid choice. Please select 1 or 2.${NC}"
