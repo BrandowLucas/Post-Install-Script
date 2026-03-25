@@ -2,7 +2,7 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="0.9.9.1"
+iteration="1.0.0"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
@@ -56,12 +56,10 @@ services=(
 libvirtd.socket iwd gpu-screen-recorder-ui #jackett.service swapspace
 )
 
-
 # CHANGE MIRROR COUNTRY HERE !!!
 
 # e.g: "France,Germany,Mexico" or "FR,DE,MX" (ISO 3166-1 alpha-2 format)
 countries="BR,US"
-
 
 # Put your shell env vars here (works for both ZSH and FISH)
 shell_config=(
@@ -140,8 +138,6 @@ zram_params_config_cachy=(
     '    RUN+="/bin/sh -c '\''echo N > /sys/module/zswap/parameters/enabled'\''"'
 )
 
-
-
 # Groups to add the current user to after installation (group must exist on the system)
 user_groups=(
     zerotier-one  # for zerotier-gui to work
@@ -159,17 +155,7 @@ custom_repos=(
 )
 
 
-
-# TODO function to patch KDE (either through kwriteconfig6 or konsave):
-# Custom KDE (Workspace and Konsole)
-#ALT + V/C for pasting/coping on Konsole
-#night light to 5000k Always on
-#kde feedback
-#gruvbox color theme
-#add system measurement widgets
-#shortcuts:
-#redo = CTRL Y
-
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 NC='\033[0m' # No Color
@@ -337,9 +323,11 @@ update_mirrorlist() {
 
             echo -e "${GREEN}Updated /etc/pacman.d/mirrorlist with the top 10 Arch Linux mirrors in $countries.${NC}"
 
-            echo -e "${YELLOW}Updating EndeavourOS repositories, please wait... ${NC}"
-            eos-rankmirrors --sort rate -t 3 --list-only
-            echo -e "${GREEN}Updated /etc/pacman.d/endeavouros-mirrorlist with top fastest EOS mirrors${NC}"
+            if grep -q "EndeavourOS" /etc/os-release; then
+                echo -e "${YELLOW}Updating EndeavourOS repositories, please wait... ${NC}"
+                eos-rankmirrors --sort rate -t 3 --list-only
+                echo -e "${GREEN}Updated /etc/pacman.d/endeavouros-mirrorlist with top fastest EOS mirrors${NC}"
+            fi
         fi
 
         yay -Sy
@@ -888,8 +876,9 @@ enable_zram() {
 
     if grep -q "cachyos" /etc/os-release; then
         echo -e "${YELLOW}Applying ZRAM changes...${NC}"
-        sudo systemctl stop systemd-zram-setup@zram0.service
-        sudo systemctl start systemd-zram-setup@zram0.service
+        sudo systemctl unmask systemd-zram-setup@zram0.service
+        sudo systemctl disable --now systemd-zram-setup@zram0.service
+        sudo systemctl enable --now systemd-zram-setup@zram0.service
     fi
 
     echo -e "${GREEN}ZRAM configuration completed.${NC}"
@@ -898,7 +887,7 @@ enable_zram() {
 }
 
 # Function to update GRUB with ZSWAP parameters
-update_grub_zswap() {
+enable_grub_zswap() {
     local zswap_params="zswap.enabled=1 zswap.compressor=$1 zswap.max_pool_percent=20 zswap.zpool=z3fold"
     local grub_config="/etc/default/grub"
     local parameter="GRUB_CMDLINE_LINUX_DEFAULT"
@@ -933,7 +922,7 @@ update_grub_zswap() {
 }
 
 # Function to update systemd-boot with ZSWAP parameters
-update_systemdboot_zswap() {
+enable_systemdboot_zswap() {
     local zswap_params="zswap.enabled=1 zswap.compressor=$1 zswap.max_pool_percent=20 zswap.zpool=z3fold"
 
     # Check if /etc/kernel/cmdline exists
@@ -1052,6 +1041,8 @@ disable_zram() {
     if grep -q "cachyos" /etc/os-release; then
         echo -e "${YELLOW}CachyOS detected, disabling zram service and removing files...${NC}"
         sudo systemctl disable --now systemd-zram-setup@zram0.service
+        sudo systemctl mask systemd-zram-setup@zram0.service
+        # called on line z_memory "2)" choice
         [ -f /etc/udev/rules.d/30-zram.rules ] && sudo rm /etc/udev/rules.d/30-zram.rules
     fi
 
@@ -1109,15 +1100,6 @@ z_memory() {
                 disable_zram
             fi
 
-            # Disable and remove the swapfile if present
-            if sudo swapon --show=NAME | grep -q '/swapfile'; then
-                echo "Swapfile detected. Removing..."
-                sudo swapoff /swapfile
-                sudo rm /swapfile
-                sudo sed -i '/\/swapfile/d' /etc/fstab
-                echo "Swapfile removed."
-            fi
-
             # Ask user for the Zswap compression option
             echo
             echo -e "${BLUE}Do you want to configure ZSWAP with${NC}"
@@ -1140,12 +1122,21 @@ z_memory() {
                     ;;
             esac
 
+            # Disable and remove the swapfile now that we have a confirmed choice
+            if sudo swapon --show=NAME | grep -q '/swapfile'; then
+                echo "Swapfile detected. Removing..."
+                sudo swapoff /swapfile
+                sudo rm /swapfile
+                sudo sed -i '/\/swapfile/d' /etc/fstab
+                echo "Swapfile removed."
+            fi
+
             # Update bootloader with Zswap parameters
             if [ -f /etc/kernel/cmdline ]; then
-                update_systemdboot_zswap "$zswap_compressor"
+                enable_systemdboot_zswap "$zswap_compressor"
                 configure_swap
             elif [ -f /etc/default/grub ]; then
-                update_grub_zswap "$zswap_compressor"
+                enable_grub_zswap "$zswap_compressor"
                 configure_swap
             else
                 echo -e "${RED}Neither /etc/kernel/cmdline nor /etc/default/grub found. Skipping bootloader update...${NC}"
@@ -1160,7 +1151,30 @@ z_memory() {
             ;;
     esac
 
-    echo -e "${YELLOW}Please reboot to apply any changes.${NC}"
+    case "$choice" in
+        1)
+            # Poll up to 5s for systemd to activate the zram device
+            local i
+            for i in 1 2 3 4 5; do
+                grep -q '/dev/zram' /proc/swaps 2>/dev/null && break
+                sleep 1
+            done
+            if grep -q '/dev/zram' /proc/swaps 2>/dev/null; then
+                echo -e "${GREEN}ZRAM is active, no need to reboot.${NC}"
+            else
+                echo -e "${YELLOW}ZRAM is not active yet, please reboot to apply changes.${NC}"
+            fi
+            ;;
+        2)
+            local zswap_enabled
+            zswap_enabled=$(cat /sys/module/zswap/parameters/enabled 2>/dev/null)
+            if [[ "$zswap_enabled" == "Y" ]]; then
+                echo -e "${GREEN}Zswap is enabled, no need to reboot your system.${NC}"
+            else
+                echo -e "${YELLOW}Zswap is not enabled, please reboot the system to enable it.${NC}"
+            fi
+            ;;
+    esac
 }
 
 remove_debounce() {
@@ -1283,136 +1297,125 @@ bootloader_customizer() {
 
 waydroid() {
     echo
-    if confirm "${BLUE}Do you want to install and configure Waydroid${NC}?"; then
-        # Lock file to prevent multiple instances
-        LOCK_FILE="/tmp/waydroid_script.lock"
-        if [ -f "$LOCK_FILE" ]; then
-            echo -e "${RED}Waydroid setup is already running. Exiting.${NC}"
-            return 1
-        fi
-
-        # Create the lock file
-        touch "$LOCK_FILE"
-        echo -e "${GREEN}Lock file created.${NC}"
-
-        # Trap to ensure lock file is removed on interrupt
-        trap 'echo -e "${RED}Interrupted. Removing lock file...${NC}"; rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1' SIGINT SIGTERM
-
-        echo -e "${BLUE}Starting Waydroid setup...${NC}"
-
-        # Step 1: Check if Waydroid and waydroid-script-git are installed
-        local waydroid_packages=("waydroid" "waydroid-script-git")
-        for pkg in "${waydroid_packages[@]}"; do
-            if pacman -Qq "$pkg" > /dev/null 2>&1; then
-                echo -e "$pkg ${GREEN}is already installed.${NC}"
-            else
-                echo -e "$pkg is not installed. Installing..."
-                yay -Sy --noconfirm "$pkg"
-                if [ $? -ne 0 ]; then
-                    echo -e "${RED}Failed to install $pkg.${NC}"
-                    rm -f "$LOCK_FILE"
-                    trap - SIGINT SIGTERM
-                    return 1
-                fi
-            fi
-        done
-
-        # Step 2: Check if Waydroid is initialized or prompt for reinitialization
-        echo -e "${BLUE}Checking Waydroid status...${NC}"
-        if ! sudo waydroid status > /dev/null 2>&1 || sudo waydroid status | grep -q "ERROR: WayDroid is not initialized"; then
-            echo -e "${YELLOW}Waydroid is not initialized. Initializing now...${NC}"
-            if sudo waydroid init -f -s GAPPS; then
-                echo -e "${GREEN}Waydroid initialized successfully.${NC}"
-            else
-                echo -e "${RED}Failed to initialize Waydroid.${NC}"
-                rm -f "$LOCK_FILE"
-                trap - SIGINT SIGTERM
-                return 1
-            fi
-        else
-            echo -e "${GREEN}Waydroid is already initialized.${NC}"
-            if confirm "${BLUE}Do you want to reinitialize Waydroid${NC}?"; then
-                echo -e "${YELLOW}Forcing Waydroid reinitialization...${NC}"
-                if sudo waydroid init -f -s GAPPS; then
-                    echo -e "${GREEN}Waydroid reinitialized successfully.${NC}"
-                else
-                    echo -e "${RED}Failed to reinitialize Waydroid.${NC}"
-                    rm -f "$LOCK_FILE"
-                    trap - SIGINT SIGTERM
-                    return 1
-                fi
-            else
-                echo -e "${GREEN}Skipping reinitialization.${NC}"
-            fi
-        fi
-
-        # Step 3: Configure firewall
-        if systemctl is-active --quiet firewalld; then
-            echo -e "${BLUE}Configuring FirewallD...${NC}"
-            if ! sudo firewall-cmd --zone=trusted --query-interface=waydroid0 > /dev/null 2>&1; then
-                sudo firewall-cmd --zone=trusted --add-interface=waydroid0 --permanent
-                sudo firewall-cmd --reload
-                echo -e "${GREEN}FirewallD configured for Waydroid.${NC}"
-            else
-                echo -e "${GREEN}FirewallD already configured for Waydroid.${NC}"
-            fi
-        elif sudo ufw status | grep -q "active"; then
-            echo -e "${BLUE}Configuring UFW...${NC}"
-            if ! sudo ufw status | grep -q "waydroid0"; then
-                sudo ufw allow in on waydroid0
-                echo -e "${GREEN}UFW configured for Waydroid.${NC}"
-            else
-                echo -e "${GREEN}UFW already configured for Waydroid.${NC}"
-            fi
-        else
-            echo -e "${YELLOW}No firewall detected or firewall not active, ignoring...${NC}"
-        fi
-
-        # Step 4: Enable and start Waydroid service
-        if ! systemctl is-enabled --quiet waydroid-container; then
-            echo -e "${BLUE}Enabling Waydroid service...${NC}"
-            sudo systemctl enable waydroid-container
-        else
-            echo -e "${GREEN}Waydroid service is already enabled.${NC}"
-        fi
-
-        if ! systemctl is-active --quiet waydroid-container; then
-            echo -e "${BLUE}Starting Waydroid service...${NC}"
-            if ! sudo systemctl start waydroid-container; then
-                echo -e "${RED}Failed to start Waydroid service.${NC}"
-                rm -f "$LOCK_FILE"
-                trap - SIGINT SIGTERM
-                return 1
-            fi
-        else
-            echo -e "${GREEN}Waydroid service is already running.${NC}"
-        fi
-
-        # Step 5: Start Waydroid session if not already running
-        if ! pgrep -f "waydroid session" > /dev/null; then
-            echo -e "${BLUE}Starting Waydroid session in the background...${NC}"
-            nohup waydroid session start > /dev/null 2>&1 &
-            sleep 2  # Brief pause to allow session to start
-        else
-            echo -e "${GREEN}Waydroid session is already running.${NC}"
-        fi
-
-        # Step 6: Display Google registration instructions
-        echo -e "${GREEN}Waydroid setup completed successfully.${NC}"
-        echo -e "${YELLOW}Please register your device with Google:${NC}"
-        echo -e "1. Run ${ORANGE}sudo waydroid shell${NC} to access the shell."
-        echo "2. Execute this command to get your Android ID:"
-        echo -e "${ORANGE}   ANDROID_RUNTIME_ROOT=/apex/com.android.runtime ANDROID_DATA=/data ANDROID_TZDATA_ROOT=/apex/com.android.tzdata ANDROID_I18N_ROOT=/apex/com.android.i18n sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select * from main where name = \\\"android_id\\\";\"${NC}"
-        echo -e "3. ${NC}Copy the ID and paste it on:${BLUE} https://www.google.com/android/uncertified${NC}"
-        echo -e "4. Run the following command upon registration: ${ORANGE}sudo systemctl restart waydroid-container.service${NC}"
-        echo -e "5. Run ${ORANGE}waydroid show-full-ui${NC} to open Waydroid GUI."
-
-        # Clean up lock file and trap on success
-        rm -f "$LOCK_FILE"
-        trap - SIGINT SIGTERM
-    else
+    if ! confirm "${BLUE}Do you want to install and configure Waydroid${NC}?"; then
         echo -e "Skipping Waydroid installation and configuration..."
+        return
     fi
+
+    # Lock file to prevent multiple instances
+    local LOCK_FILE="/tmp/waydroid_script.lock"
+    if [ -f "$LOCK_FILE" ]; then
+        echo -e "${RED}Waydroid setup is already running. Exiting.${NC}"
+        return 1
+    fi
+    touch "$LOCK_FILE"
+
+    # Trap to ensure lock file is removed on interrupt
+    trap 'echo -e "${RED}Interrupted. Removing lock file...${NC}"; rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM' SIGINT SIGTERM
+
+    echo -e "${BLUE}Starting Waydroid setup...${NC}"
+
+    # Step 1: Install packages
+    local waydroid_packages=("waydroid" "waydroid-script-git")
+    for pkg in "${waydroid_packages[@]}"; do
+        if pacman -Qq "$pkg" > /dev/null 2>&1; then
+            echo -e "$pkg ${GREEN}is already installed.${NC}"
+        else
+            echo -e "$pkg is not installed. Installing..."
+            yay -Sy --noconfirm "$pkg"
+            if [ $? -ne 0 ]; then
+                echo -e "${RED}Failed to install $pkg.${NC}"
+                rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1
+            fi
+        fi
+    done
+
+    # Step 2: Configure firewall
+    if systemctl is-active --quiet firewalld; then
+        echo -e "${BLUE}Configuring FirewallD...${NC}"
+        if ! sudo firewall-cmd --zone=trusted --query-interface=waydroid0 > /dev/null 2>&1; then
+            sudo firewall-cmd --zone=trusted --add-interface=waydroid0 --permanent
+            sudo firewall-cmd --reload
+            echo -e "${GREEN}FirewallD configured for Waydroid.${NC}"
+        else
+            echo -e "${GREEN}FirewallD already configured for Waydroid.${NC}"
+        fi
+    elif sudo ufw status 2>/dev/null | grep -q "active"; then
+        echo -e "${BLUE}Configuring UFW...${NC}"
+        if ! sudo ufw status | grep -q "waydroid0"; then
+            sudo ufw allow in on waydroid0
+            echo -e "${GREEN}UFW configured for Waydroid.${NC}"
+        else
+            echo -e "${GREEN}UFW already configured for Waydroid.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}No firewall detected or firewall not active, ignoring...${NC}"
+    fi
+
+    # Step 3: Enable and start Waydroid service
+    if ! systemctl is-enabled --quiet waydroid-container; then
+        echo -e "${BLUE}Enabling Waydroid service...${NC}"
+        sudo systemctl enable waydroid-container
+    else
+        echo -e "${GREEN}Waydroid service is already enabled.${NC}"
+    fi
+
+    if ! systemctl is-active --quiet waydroid-container; then
+        echo -e "${BLUE}Starting Waydroid service...${NC}"
+        if ! sudo systemctl start waydroid-container; then
+            echo -e "${RED}Failed to start Waydroid service.${NC}"
+            rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1
+        fi
+    else
+        echo -e "${GREEN}Waydroid service is already running.${NC}"
+    fi
+
+    # Step 4: Start Waydroid session if not already running
+    if ! pgrep -f "waydroid session" > /dev/null; then
+        echo -e "${BLUE}Starting Waydroid session in the background...${NC}"
+        nohup waydroid session start > /dev/null 2>&1 &
+        sleep 2
+    else
+        echo -e "${GREEN}Waydroid session is already running.${NC}"
+    fi
+
+    # Step 5: Initialize — ask only now that services are running
+    echo
+    echo -e "${BLUE}Checking Waydroid initialization status...${NC}"
+    if ! sudo waydroid status 2>/dev/null | grep -q "RUNNING"; then
+        echo -e "${YELLOW}Waydroid is not initialized. Initializing now...${NC}"
+        if ! sudo waydroid init -f -s GAPPS; then
+            echo -e "${RED}Failed to initialize Waydroid.${NC}"
+            rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1
+        fi
+        echo -e "${GREEN}Waydroid initialized successfully.${NC}"
+    else
+        echo -e "${GREEN}Waydroid is already initialized.${NC}"
+        if confirm "${BLUE}Do you want to reinitialize Waydroid${NC}?"; then
+            echo -e "${YELLOW}Forcing Waydroid reinitialization...${NC}"
+            if ! sudo waydroid init -f -s GAPPS; then
+                echo -e "${RED}Failed to reinitialize Waydroid.${NC}"
+                rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1
+            fi
+            echo -e "${GREEN}Waydroid reinitialized successfully.${NC}"
+        else
+            echo -e "${GREEN}Skipping reinitialization.${NC}"
+        fi
+    fi
+
+    # Step 6: Display Google registration instructions
+    echo
+    echo -e "${GREEN}Waydroid setup completed successfully.${NC}"
+    echo -e "${YELLOW}Please register your device with Google:${NC}"
+    echo -e "1. Run ${ORANGE}sudo waydroid shell${NC} to access the shell."
+    echo -e "2. Execute this command to get your Android ID:"
+    echo -e "${ORANGE}   ANDROID_RUNTIME_ROOT=/apex/com.android.runtime ANDROID_DATA=/data ANDROID_TZDATA_ROOT=/apex/com.android.tzdata ANDROID_I18N_ROOT=/apex/com.android.i18n sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select * from main where name = \\\"android_id\\\";\"${NC}"
+    echo -e "3. Copy the ID and paste it on:${BLUE} https://www.google.com/android/uncertified${NC}"
+    echo -e "4. Run the following command upon registration: ${ORANGE}sudo systemctl restart waydroid-container.service${NC}"
+    echo -e "5. Run ${ORANGE}waydroid show-full-ui${NC} to open Waydroid GUI."
+
+    rm -f "$LOCK_FILE"
+    trap - SIGINT SIGTERM
 }
 
 install_firewall() {
@@ -1456,17 +1459,7 @@ install_firewall() {
 }
 
 setup_plymouth() {
-    echo -e "${BLUE}Checking if Plymouth is installed...${NC}"
-    if ! pacman -Qq plymouth &>/dev/null; then
-        echo -e "${RED}Plymouth is not installed. Installing Plymouth...${NC}"
-        sudo pacman -Sy --noconfirm plymouth
-        echo -e "${GREEN}Plymouth has been installed.${NC}"
-    else
-        echo -e "${GREEN}Plymouth is already installed.${NC}"
-    fi
-
-    # Ask if the user wants a default or custom theme
-    echo -e "${BLUE}Do you want to choose a default theme or a custom one from AUR?${NC}"
+    echo -e "${BLUE}Do you want to configure Plymouth boot splash?${NC}"
     echo -e "1) Choose a default theme"
     echo -e "2) Set a custom theme from AUR (requires a valid theme package input)"
     echo -e "0) Skip"
@@ -1476,6 +1469,12 @@ setup_plymouth() {
 
     case "$choice" in
         1)
+            if ! pacman -Qq plymouth &>/dev/null; then
+                echo -e "${YELLOW}Installing Plymouth...${NC}"
+                sudo pacman -Sy --noconfirm plymouth
+                echo -e "${GREEN}Plymouth has been installed.${NC}"
+            fi
+
             echo -e "${BLUE}Listing available Plymouth themes:${NC}"
             plymouth-set-default-theme -l
 
@@ -1494,6 +1493,13 @@ setup_plymouth() {
             fi
             ;;
         2)
+            # Install Plymouth only now that we know user wants it
+            if ! pacman -Qq plymouth &>/dev/null; then
+                echo -e "${YELLOW}Installing Plymouth...${NC}"
+                sudo pacman -Sy --noconfirm plymouth
+                echo -e "${GREEN}Plymouth has been installed.${NC}"
+            fi
+
             echo -e "${ORANGE}Enter the package name for the custom theme (e.g., plymouth-theme-endeavouros):${NC}"
             read -r package_name
 
@@ -1601,9 +1607,9 @@ main() {
     updatesys
     configure_custom_repos
     install_shell
+    z_memory
     backup_system
     bootloader_customizer
-    z_memory
     install_gui_store
     install_gaming_deps
     choose_driver_installation
@@ -1624,3 +1630,13 @@ main() {
 }
 
 main
+
+# TODO function to patch KDE (either through kwriteconfig6 or konsave):
+# Custom KDE (Workspace and Konsole)
+#ALT + V/C for pasting/coping on Konsole
+#night light to 5000k Always on
+#kde feedback
+#gruvbox color theme
+#add system measurement widgets
+#shortcuts:
+#redo = CTRL Y
