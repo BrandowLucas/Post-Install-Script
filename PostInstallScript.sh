@@ -2,7 +2,7 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="0.9.8"
+iteration="0.9.8.1"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
@@ -10,7 +10,7 @@ flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corect
 )
 
 prog_packages=(
-python-pip zed cmake gdb strace sourcegit git-credential-manager github-cli maven jdk21-openjdk jdk8-openjdk recaf #intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
+python-pip zed cmake gdb strace sourcegit git-credential-manager github-cli maven jdk21-openjdk jdk8-openjdk recaf # helix intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
 glfw glew extra-cmake-modules
 )
 
@@ -227,7 +227,7 @@ updatesys() {
         # Install 'archlinux-keyring' if not already installed
       #  if ! yay -Qq | grep -qw "archlinux-keyring"; then
             echo "Installing archlinux-keyring..."
-            yay -S --noconfirm archlinux-keyring
+            yay -Sy --noconfirm archlinux-keyring
      #   fi
 
         # Update system
@@ -355,7 +355,7 @@ install_gui_store() {
         1)
             if ! yay -Qq pamac-flatpak &>/dev/null; then
                 echo "Installing Pamac..."
-                yay -S --noconfirm pamac-flatpak
+                yay -Sy --noconfirm pamac-flatpak
             else
                 echo -e "${GREEN}Pamac is already installed.${NC}"
             fi
@@ -363,7 +363,7 @@ install_gui_store() {
         2)
             if ! yay -Qq discover &>/dev/null; then
                 echo "Installing Discover..."
-                yay -S --noconfirm discover
+                yay -Sy --noconfirm discover
             else
                 echo -e "${GREEN}Discover is already installed.${NC}"
             fi
@@ -371,7 +371,7 @@ install_gui_store() {
         3)
             if ! yay -Qq octopi &>/dev/null; then
                 echo "Installing Octopi..."
-                yay -S --noconfirm octopi
+                yay -Sy --noconfirm octopi
             else
                 echo -e "${GREEN}Octopi is already installed.${NC}"
             fi
@@ -394,7 +394,7 @@ install_other_software() {
             echo -e "$pkg ${GREEN}is already installed.${NC}"
         else
             echo "$pkg is not installed. Installing..."
-            yay -S --noconfirm "$pkg"
+            yay -Sy --noconfirm "$pkg"
         fi
     done
         else
@@ -446,7 +446,7 @@ install_prog_software() {
             echo -e "$pkg ${GREEN}is already installed.${NC}"
         else
             echo "$pkg is not installed. Installing..."
-            yay -S --noconfirm "$pkg"
+            yay -Sy --noconfirm "$pkg"
         fi
     done
         else
@@ -465,7 +465,7 @@ install_network_tools() {
                 echo -e "$pkg ${GREEN}is already installed.${NC}"
             else
                 echo "$pkg is not installed. Installing..."
-                yay -S --noconfirm "$pkg"
+                yay -Sy --noconfirm "$pkg"
             fi
         done
             else
@@ -483,7 +483,7 @@ gaming_dependencies() {
             echo -e "$pkg ${GREEN}is already installed.${NC}"
         else
             echo "$pkg is not installed. Installing..."
-            yay -S --noconfirm "$pkg"
+            yay -Sy --noconfirm "$pkg"
         fi
     done
         else
@@ -504,7 +504,7 @@ choose_driver_installation() {
                 echo -e "$pkg ${GREEN}is already installed.${NC}"
             else
                 echo "$pkg is not installed. Installing..."
-                yay -S --noconfirm "$pkg"
+                yay -Sy --noconfirm "$pkg"
             fi
         done
     }
@@ -521,7 +521,7 @@ choose_driver_installation() {
                 echo -e "$pkg ${GREEN}is already installed.${NC}"
             else
                 echo "$pkg is not installed. Installing..."
-                yay -S --noconfirm "$pkg"
+                yay -Sy --noconfirm "$pkg"
             fi
         done
     }
@@ -553,7 +553,7 @@ install_shell() {
     install_zsh() {
             if ! yay -Qq | grep -q "^zsh$"; then
                 echo "Installing ZSH..."
-                yay -S --noconfirm zsh
+                yay -Sy --noconfirm zsh
             else
                 echo -e "ZSH ${GREEN}is already installed.${NC}"
             fi
@@ -601,7 +601,7 @@ install_shell() {
             # Install fzf
             if ! command -v fzf &> /dev/null; then
                 echo "Installing fzf..."
-                yay -S --noconfirm fzf
+                yay -Sy --noconfirm fzf
             else
                 echo -e "fzf ${GREEN}is already installed.${NC}"
             fi
@@ -643,7 +643,7 @@ EOF
         echo -e "${GREEN}FISH is already installed.${NC}"
     else
         echo "Installing FISH..."
-        yay -S --noconfirm fish || { echo "Failed to install FISH"; exit 1; }
+        yay -Sy --noconfirm fish || { echo "Failed to install FISH"; exit 1; }
     fi
 
     # Check if starship is installed
@@ -651,7 +651,7 @@ EOF
         echo -e "${GREEN}Starship is already installed.${NC}"
     else
         echo "Installing Starship..."
-        yay -S --noconfirm archlinux-keyring starship || { echo "Failed to install Starship"; exit 1; }
+        yay -Sy --noconfirm archlinux-keyring starship || { echo "Failed to install Starship"; exit 1; }
     fi
 
     # Check and set default shell
@@ -715,7 +715,7 @@ alacritty() {
             echo -e "alacritty ${GREEN}is already installed.${NC}"
         else
             echo "alacritty is not installed. Installing..."
-            yay -S --noconfirm "alacritty"
+            yay -Sy --noconfirm "alacritty"
         fi
     mkdir -p $HOME/.config/alacritty/
     bash -c 'cat  << EOF > $HOME/.config/alacritty/alacritty.toml
@@ -1093,7 +1093,7 @@ configure_steam() {
                 echo -e "${GREEN}Steam is already installed.${NC}"
             else
                 echo -e "${YELLOW}Installing Steam...${NC}"
-                yay -S --noconfirm steam xdg-desktop-portal-gtk
+                yay -Sy --noconfirm steam xdg-desktop-portal-gtk
             fi
 
             # Install MangoHud for performance overlay
@@ -1101,7 +1101,7 @@ configure_steam() {
                 echo -e "${GREEN}MangoHud is already installed.${NC}"
             else
                 echo -e "${YELLOW}Installing MangoHud...${NC}"
-                yay -S --noconfirm mangohud lib32-mangohud
+                yay -Sy --noconfirm mangohud lib32-mangohud
             fi
 
             echo -e "${GREEN}Disabling Shader Pre-Cache, enabling Proton Experimental, and setting default tab to Library...${NC}"
@@ -1362,7 +1362,7 @@ darkmode_on_root() {
     echo -e "${BLUE}Do you want to enable user theme into root${NC}? (y/n): "
     read choice
     if [[ "$choice" == "y" ]]; then
-        yay -S konsave
+        yay -Sy konsave
         konsave -s user && konsave -e user
         sudo konsave -i ~/user.knsv
         sudo konsave -a user
@@ -1384,7 +1384,7 @@ bootloader_customizer() {
                     echo -e "$pkg ${GREEN}is already installed.${NC}"
                 else
                     echo "$pkg is not installed. Installing..."
-                    yay -S --noconfirm "$pkg"
+                    yay -Sy --noconfirm "$pkg"
                 fi
             done
             sudo update-grub
@@ -1426,7 +1426,7 @@ waydroid() {
                 echo -e "$pkg ${GREEN}is already installed.${NC}"
             else
                 echo -e "$pkg is not installed. Installing..."
-                yay -S --noconfirm "$pkg"
+                yay -Sy --noconfirm "$pkg"
                 if [ $? -ne 0 ]; then
                     echo -e "${RED}Failed to install $pkg.${NC}"
                     rm -f "$LOCK_FILE"
@@ -1543,7 +1543,7 @@ install_firewall() {
         1)
             if ! yay -Qq ufw &>/dev/null; then
                 echo "Installing UFW..."
-                yay -S --noconfirm ufw
+                yay -Sy --noconfirm ufw
                 echo -e "${GREEN}Enabling services....${NC}"
                 sudo systemctl enable --now firewalld
                 sudo systemctl disable --now ufw
@@ -1557,7 +1557,7 @@ install_firewall() {
         2)
             if ! yay -Qq firewalld &>/dev/null; then
                 echo "Installing Firewalld..."
-                yay -S --noconfirm firewalld
+                yay -Sy --noconfirm firewalld
                 echo -e "${GREEN}Enabling services....${NC}"
                 sudo systemctl enable --now firewalld
                 sudo systemctl disable --now ufw
@@ -1578,7 +1578,7 @@ setup_plymouth() {
   echo -e "${BLUE}Checking if Plymouth is installed...${NC}"
   if ! yay -Qq plymouth &>/dev/null; then
     echo -e "${RED}Plymouth is not installed. Installing Plymouth...${NC}"
-    yay -S --noconfirm plymouth
+    yay -Sy --noconfirm plymouth
     echo -e "${GREEN}Plymouth has been installed.${NC}"
   else
     echo -e "${GREEN}Plymouth is already installed.${NC}"
@@ -1629,7 +1629,7 @@ setup_plymouth() {
         theme_changed=true
     else
     # Install the package using yay (it will install print "successfully installed" for whatever package the user inputs, no matter if it is not a valid package)
-        yay -S --noconfirm "$package_name"
+        yay -Sy --noconfirm "$package_name"
         echo -e "${GREEN}Custom theme '${package_name}' has been installed.${NC}"
         custom_theme_installed=true
         theme_changed=true
