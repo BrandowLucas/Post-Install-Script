@@ -2,7 +2,7 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="0.9.9"
+iteration="0.9.9.1"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
@@ -142,11 +142,24 @@ zram_params_config_cachy=(
 
 
 
-# sudo usermod -aG zerotier-one striker (for zerotier-gui to work)
-# TODO: Make a output for software that is being installed on other, programming, network and flatpak applications. Similar to what to enable_services() and remove_packages() already do.
+# Groups to add the current user to after installation (group must exist on the system)
+user_groups=(
+    zerotier-one  # for zerotier-gui to work
+)
+
+# Custom repositories to configure in /etc/pacman.conf
+# Format: "name|mirrorlist_path|keyring_pkg|mirrorlist_pkg|key_id|keyserver|keyring_url|mirrorlist_url"
+# - mirrorlist_path: the actual path used in the pacman.conf Include directive
+# - key_id + keyserver: used for pacman-key --recv-key / --lsign-key
+# - keyring_url / mirrorlist_url: remote .pkg.tar.zst to install via pacman -U
+
+# Leave a field empty (but keep the |) if not needed.
+custom_repos=(
+    "chaotic-aur|/etc/pacman.d/chaotic-mirrorlist|chaotic-keyring|chaotic-mirrorlist|3056513887B78AEB|keyserver.ubuntu.com|https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst|https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst"
+)
 
 
-# TODO: Make function to add custom repos via a variable, and maybe move chaotic aur function to it (altough not sure how im going to implement key/gpg auto signing support)
+
 # TODO function to patch KDE (either through kwriteconfig6 or konsave):
 # Custom KDE (Workspace and Konsole)
 #ALT + V/C for pasting/coping on Konsole
@@ -181,6 +194,20 @@ confirm() {
     [[ "$choice" == "y" || "$choice" == "yes" ]]
 }
 
+# Helper: join array elements with ", "
+# Usage: join_list "${array[@]}"
+join_list() {
+    local result=""
+    for item in "$@"; do
+        if [ -z "$result" ]; then
+            result="$item"
+        else
+            result="$result, $item"
+        fi
+    done
+    echo "$result"
+}
+
 # Helper: install packages from an array (handles both AUR and official via yay)
 # All queries use pacman -Qq (local db only)
 # Usage: install_pkg_list "${array[@]}"
@@ -195,11 +222,97 @@ install_pkg_list() {
     done
 }
 
+# Helper: add user to groups that exist on the system
+add_user_groups() {
+    if [ ${#user_groups[@]} -eq 0 ]; then
+        return
+    fi
+
+    echo
+    echo -e "${BLUE}Do you want to add your user to the following groups?${NC}"
+    echo -e "It will add you to: ${ORANGE}$(join_list "${user_groups[@]}")${NC}"
+    if confirm ""; then
+        local current_user
+        current_user=$(whoami)
+
+        for group in "${user_groups[@]}"; do
+            if getent group "$group" > /dev/null 2>&1; then
+                if id -nG "$current_user" | grep -qw "$group"; then
+                    echo -e "${GREEN}User $current_user is already in group $group.${NC}"
+                else
+                    sudo usermod -aG "$group" "$current_user"
+                    echo -e "${GREEN}Added $current_user to group $group.${NC}"
+                fi
+            else
+                echo -e "${YELLOW}Group $group does not exist on this system, skipping...${NC}"
+            fi
+        done
+    else
+        echo "Skipping user group configuration..."
+    fi
+}
+
 logo() {
-    echo -e ""
-    echo -e "${BOLD}EOS Post install script ver ${iteration}${NC}"
-    echo -e "By ${UNDERLINE}https://github.com/BrandowLucas${NC}"
-    echo -e ""
+    local art=(
+        '__________               __    .___                 __         .__  .__   '
+        '\______   \____  _______/  |_  |   | ____   _______/  |______  |  | |  | '
+        ' |     ___/  _ \/  ___/\   __\ |   |/    \ /  ___/\   __\__  \ |  | |  | '
+        ' |    |  (  <_> )___ \  |  |   |   |   |  \\___ \  |  |  / __ \|  |_|  |__'
+        ' |____|   \____/____  > |__|   |___|___|  /____  > |__| (____  /____/____/'
+        '                    \/                  \/     \/            \/           '
+        '                                                                           '
+        '          ___.             _________ __         .__ __                    '
+        '          \_ |__ ___.__.  /   _____//  |________|__|  | __ ___________    '
+        '  ______   | __ <   |  |  \_____  \\   __\_  __ \  |  |/ // __ \_  __ \  '
+        ' /_____/   | \_\ \___  |  /        \|  |  |  | \/  |    <\  ___/|  | \/  '
+        '           |___  / ____| /_______  /|__|  |__|  |__|__|_ \\___  >__|      '
+        '               \/\/              \/                     \/    \/          '
+    )
+
+    local rainbow=(
+        '\033[31m'   # red
+        '\033[33m'   # yellow
+        '\033[32m'   # green
+        '\033[36m'   # cyan
+        '\033[34m'   # blue
+        '\033[35m'   # magenta
+    )
+    local nc='\033[0m'
+    local bold='\033[1m'
+    local n=${#rainbow[@]}
+
+    # Find max art line length
+    local max_w=0
+    for line in "${art[@]}"; do
+        (( ${#line} > max_w )) && max_w=${#line}
+    done
+
+    # Meta line: version + author
+    local meta="  ver ${iteration}  |  github.com/BrandowLucas  "
+    (( ${#meta} > max_w )) && max_w=${#meta}
+
+    local inner=$(( max_w + 2 ))  # 1 space padding each side
+
+    # Build border string
+    local border="+"
+    for ((i=0; i<inner; i++)); do border+="-"; done
+    border+="+"
+
+    local ci=0
+
+    printf "${bold}${rainbow[$ci]}%s${nc}\n" "$border";  ci=$(( (ci+1) % n ))
+    printf "${rainbow[$ci]}| %-${max_w}s |${nc}\n" "";   ci=$(( (ci+1) % n ))
+
+    for line in "${art[@]}"; do
+        printf "${rainbow[$ci]}| %-${max_w}s |${nc}\n" "$line"
+        ci=$(( (ci+1) % n ))
+    done
+
+    printf "${rainbow[$ci]}| %-${max_w}s |${nc}\n" "";   ci=$(( (ci+1) % n ))
+    printf "${bold}${rainbow[$ci]}| %-${max_w}s |${nc}\n" "$meta"; ci=$(( (ci+1) % n ))
+    printf "${rainbow[$ci]}| %-${max_w}s |${nc}\n" "";   ci=$(( (ci+1) % n ))
+
+    printf "${bold}${rainbow[$ci]}%s${nc}\n\n" "$border"
 }
 
 update_mirrorlist() {
@@ -249,64 +362,84 @@ updatesys() {
     fi
 }
 
-configure_chaotic_aur() {
-    echo
-    if confirm "${BLUE}Do you want to configure Chaotic AUR ${RED}(recommended)${NC}?"; then
-        # Check if [chaotic-aur] section exists and comment it out if necessary
-        if grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-            # Comment out the [chaotic-aur] section
-            echo "The [chaotic-aur] section is present in /etc/pacman.conf. Commenting it out..."
-            sudo sed -i 's/^\[chaotic-aur\]/#\[chaotic-aur\]/' /etc/pacman.conf
-            sudo sed -i 's/^Include = \/etc\/pacman.d\/chaotic-mirrorlist/#Include = \/etc\/pacman.d\/chaotic-mirrorlist/' /etc/pacman.conf
-        fi
+# Generic function to configure a custom repo from the custom_repos array
+# Format: "name|mirrorlist_path|keyring_pkg|mirrorlist_pkg|key_id|keyserver|keyring_url|mirrorlist_url"
+configure_repo() {
+    local entry="$1"
+    local name mirrorlist_path keyring_pkg mirrorlist_pkg key_id keyserver keyring_url mirrorlist_url
+    IFS='|' read -r name mirrorlist_path keyring_pkg mirrorlist_pkg key_id keyserver keyring_url mirrorlist_url <<< "$entry"
 
-        # Check if chaotic-keyring is installed
-        if ! pacman -Qq chaotic-keyring > /dev/null 2>&1; then
+    local escaped_mirrorlist
+    escaped_mirrorlist=$(echo "$mirrorlist_path" | sed 's/\//\\\//g')
+
+    echo -e "${YELLOW}Configuring ${name}...${NC}"
+
+    # Comment out existing section temporarily to avoid conflicts during setup
+    if grep -q "^\[${name}\]" /etc/pacman.conf; then
+        sudo sed -i "s/^\[${name}\]/#\[${name}\]/" /etc/pacman.conf
+        sudo sed -i "s/^Include = ${escaped_mirrorlist}/#Include = ${escaped_mirrorlist}/" /etc/pacman.conf
+    fi
+
+    # Install keyring
+    if ! pacman -Qq "$keyring_pkg" > /dev/null 2>&1; then
+        if [[ -n "$key_id" && -n "$keyserver" ]]; then
             sudo pacman-key --init
-            sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
-            sudo pacman-key --lsign-key 3056513887B78AEB
-            echo "chaotic-keyring is not installed. Installing..."
-            sudo rm -rf /etc/pacman.d/chaotic*
-            sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
-        else
-            echo -e "${GREEN}chaotic-keyring is already installed.${NC}"
+            sudo pacman-key --recv-key "$key_id" --keyserver "$keyserver"
+            sudo pacman-key --lsign-key "$key_id"
         fi
-
-        # Check if chaotic-mirrorlist is installed
-        if ! pacman -Qq chaotic-mirrorlist > /dev/null 2>&1; then
-            echo "chaotic-mirrorlist is not installed. Installing..."
-            sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-            sudo pacman -Sy # just in case
-        else
-            echo -e "${GREEN}chaotic-mirrorlist is already installed.${NC}"
-        fi
-
-        # Check if /etc/pacman.d/chaotic-mirrorlist exists and is readable
-        if [ ! -r /etc/pacman.d/chaotic-mirrorlist ]; then
-            echo "Error: /etc/pacman.d/chaotic-mirrorlist could not be read or does not exist."
-            echo "Please ensure the file exists and is readable before configuring Chaotic AUR."
-            return 1
-        fi
-
-        # Check if [chaotic-aur] section should be uncommented
-        if grep -q "^#\[chaotic-aur\]" /etc/pacman.conf; then
-            echo "The [chaotic-aur] section is commented out in /etc/pacman.conf. Uncommenting..."
-            sudo sed -i 's/^#\[chaotic-aur\]/\[chaotic-aur\]/' /etc/pacman.conf
-            sudo sed -i 's/^#Include = \/etc\/pacman.d\/chaotic-mirrorlist/Include = \/etc\/pacman.d\/chaotic-mirrorlist/' /etc/pacman.conf
-        else
-            # Section doesn't exist, so append it
-            if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-                sudo bash -c 'cat << EOF >> /etc/pacman.conf
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
-EOF'
-                echo -e "${GREEN}Chaotic AUR configuration has been added to /etc/pacman.conf.${NC}"
-            else
-                echo "Chaotic AUR is already configured in /etc/pacman.conf."
-            fi
-        fi
+        echo "${keyring_pkg} is not installed. Installing..."
+        sudo rm -rf "/etc/pacman.d/${name}"*
+        sudo pacman -U --noconfirm "$keyring_url"
     else
-        echo "Skipping Chaotic AUR configuration..."
+        echo -e "${GREEN}${keyring_pkg} is already installed.${NC}"
+    fi
+
+    # Install mirrorlist
+    if ! pacman -Qq "$mirrorlist_pkg" > /dev/null 2>&1; then
+        echo "${mirrorlist_pkg} is not installed. Installing..."
+        sudo pacman -U --noconfirm "$mirrorlist_url"
+        sudo pacman -Sy
+    else
+        echo -e "${GREEN}${mirrorlist_pkg} is already installed.${NC}"
+    fi
+
+    # Verify mirrorlist is readable
+    if [ ! -r "$mirrorlist_path" ]; then
+        echo -e "${RED}Error: ${mirrorlist_path} could not be read or does not exist.${NC}"
+        return 1
+    fi
+
+    # Enable the section in pacman.conf
+    if grep -q "^#\[${name}\]" /etc/pacman.conf; then
+        sudo sed -i "s/^#\[${name}\]/\[${name}\]/" /etc/pacman.conf
+        sudo sed -i "s/^#Include = ${escaped_mirrorlist}/Include = ${escaped_mirrorlist}/" /etc/pacman.conf
+        echo -e "${GREEN}${name} section uncommented in /etc/pacman.conf.${NC}"
+    elif ! grep -q "\[${name}\]" /etc/pacman.conf; then
+        printf "\n[%s]\nInclude = %s\n" "$name" "$mirrorlist_path" | sudo tee -a /etc/pacman.conf > /dev/null
+        echo -e "${GREEN}${name} configuration has been added to /etc/pacman.conf.${NC}"
+    else
+        echo -e "${GREEN}${name} is already configured in /etc/pacman.conf.${NC}"
+    fi
+}
+
+configure_custom_repos() {
+    if [ ${#custom_repos[@]} -eq 0 ]; then
+        return
+    fi
+
+    echo
+    local repo_names=()
+    for entry in "${custom_repos[@]}"; do
+        repo_names+=("${entry%%|*}")
+    done
+    echo -e "${BLUE}Do you want to configure custom repositories ${RED}(recommended)${NC}?"
+    echo -e "It will configure the following repos: ${ORANGE}$(join_list "${repo_names[@]}")${NC}"
+    if confirm ""; then
+        for entry in "${custom_repos[@]}"; do
+            configure_repo "$entry"
+        done
+    else
+        echo "Skipping custom repository configuration..."
     fi
 }
 
@@ -402,7 +535,9 @@ install_gui_store() {
 # Function to install other software
 install_other_software() {
     echo
-    if confirm "${BLUE}Do you want to install other software?${NC}"; then
+    echo -e "${BLUE}Do you want to install other software?${NC}"
+    echo -e "It will install the following packages: ${ORANGE}$(join_list "${packages[@]}")${NC}"
+    if confirm ""; then
         install_pkg_list "${packages[@]}"
     else
         echo "Skipping installation of other software..."
@@ -411,7 +546,9 @@ install_other_software() {
 
 install_flatpak_apps() {
     echo
-    if confirm "${BLUE}Do you want to install Flatpak applications?${NC}"; then
+    echo -e "${BLUE}Do you want to install Flatpak applications?${NC}"
+    echo -e "It will install the following flatpak apps: ${ORANGE}$(join_list "${flatpak_apps[@]}")${NC}"
+    if confirm ""; then
         echo -e "${YELLOW}Installing Flatpak applications...${NC}"
         for app in "${flatpak_apps[@]}"; do
             # Check if the app is already installed (system or user)
@@ -443,7 +580,9 @@ install_flatpak_apps() {
 # Function to install programming software
 install_prog_software() {
     echo
-    if confirm "${BLUE}Do you want to install programming/debugging software?${NC}"; then
+    echo -e "${BLUE}Do you want to install programming/debugging software?${NC}"
+    echo -e "It will install the following packages: ${ORANGE}$(join_list "${prog_packages[@]}")${NC}"
+    if confirm ""; then
         install_pkg_list "${prog_packages[@]}"
     else
         echo "Skipping programming software installation..."
@@ -452,7 +591,9 @@ install_prog_software() {
 
 install_network_tools() {
     echo
-    if confirm "${BLUE}Do you want to install network/pentest tools?${NC}"; then
+    echo -e "${BLUE}Do you want to install network/pentest tools?${NC}"
+    echo -e "It will install the following packages: ${ORANGE}$(join_list "${pentest_packages[@]}")${NC}"
+    if confirm ""; then
         install_pkg_list "${pentest_packages[@]}"
     else
         echo "Skipping network/pentest tools installation..."
@@ -461,7 +602,9 @@ install_network_tools() {
 
 install_gaming_deps() {
     echo
-    if confirm "${BLUE}Do you want to install gaming dependencies?${NC}"; then
+    echo -e "${BLUE}Do you want to install gaming dependencies?${NC}"
+    echo -e "It will install the following packages: ${ORANGE}$(join_list "${gaming_packages[@]}")${NC}"
+    if confirm ""; then
         install_pkg_list "${gaming_packages[@]}"
     else
         echo "Skipping gaming dependencies installation..."
@@ -1038,7 +1181,7 @@ EOF'
 enable_services() {
     echo
     echo -e "${BLUE}Do you want to enable services?${NC}"
-    echo -e "It will enable the following services: ${ORANGE}${services[*]}${NC}"
+    echo -e "It will enable the following services: ${ORANGE}$(join_list "${services[@]}")${NC}"
     if confirm ""; then
         for service in "${services[@]}"; do
             # Check if the service is already enabled (system or user)
@@ -1070,8 +1213,9 @@ enable_services() {
 
 remove_packages() {
     echo
-    echo -e "It will remove the following packages: ${RED}${remove_packages[*]}${NC}"
-    if confirm "${BLUE}Do you want to remove these packages?${NC}"; then
+    echo -e "${BLUE}Do you want to remove these packages?${NC}"
+    echo -e "It will remove the following packages: ${RED}$(join_list "${remove_packages[@]}")${NC}"
+    if confirm ""; then
         for pkg in "${remove_packages[@]}"; do
             if pacman -Qq "$pkg" > /dev/null 2>&1; then
                 echo "$pkg is installed. Removing..."
@@ -1261,7 +1405,7 @@ waydroid() {
         echo -e "${ORANGE}   ANDROID_RUNTIME_ROOT=/apex/com.android.runtime ANDROID_DATA=/data ANDROID_TZDATA_ROOT=/apex/com.android.tzdata ANDROID_I18N_ROOT=/apex/com.android.i18n sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select * from main where name = \\\"android_id\\\";\"${NC}"
         echo -e "3. ${NC}Copy the ID and paste it on:${BLUE} https://www.google.com/android/uncertified${NC}"
         echo -e "4. Run the following command upon registration: ${ORANGE}sudo systemctl restart waydroid-container.service${NC}"
-        echo -e "5. Run ${GREEN}waydroid show-full-ui${NC} to open Waydroid GUI."
+        echo -e "5. Run ${ORANGE}waydroid show-full-ui${NC} to open Waydroid GUI."
 
         # Clean up lock file and trap on success
         rm -f "$LOCK_FILE"
@@ -1455,7 +1599,7 @@ main() {
 
     update_mirrorlist
     updatesys
-    configure_chaotic_aur
+    configure_custom_repos
     install_shell
     backup_system
     bootloader_customizer
@@ -1475,6 +1619,7 @@ main() {
     configure_printer
     setup_plymouth
     enable_services
+    add_user_groups
    # darkmode_on_root TODO: needs "konsave" into chaotic AUR
 }
 
