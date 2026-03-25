@@ -2,15 +2,15 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="0.9.7"
+iteration="0.9.8"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
-flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools xorg-xeyes fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave exa lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw darkly  plasma-x11-session qemu-desktop virt-manager protonplus libinput-tools evtest gemini-cli # quickemu chatgpt-desktop-bin keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager signal-desktop jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass haguichi vesktop piper
+flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave exa lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest gemini-cli signal-desktop darkly-bin hmcl-beta-bin xorg-xeyes  # plasma-x11-session quickemu chatgpt-desktop-bin keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager signal-desktop jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass haguichi vesktop piper
 )
 
 prog_packages=(
-python-pip zed cmake gdb strace sourcegit git-credential-manager github-cli maven jdk21-openjdk #jdk8-openjdk #intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
+python-pip zed cmake gdb strace sourcegit git-credential-manager github-cli maven jdk21-openjdk jdk8-openjdk recaf #intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
 glfw glew extra-cmake-modules
 )
 
@@ -92,6 +92,52 @@ shell_config=(
     'alias fwine32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile wine"'
     'alias fwinecfg32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile winecfg"'
 
+)
+
+# ZRAM configuration (generator settings)
+zram_config=(
+    # Use 'ram' for 100% or 'ram / 2' for 50%.
+    # On 6GB RAM, 100% is recommended for better multitasking.
+    '[zram0]'
+    'compression-algorithm = %ALGO%'
+    'zram-size = ram * 2'  # gives ~12GB zram
+    'swap-priority = 100'
+    'fs-type = swap'
+
+   # '#writeback-device = /dev/loop0'
+)
+
+# ZRAM parameters (Standard)
+zram_params_config=(
+    # Force the system to compress idle background apps
+    'vm.swappiness = 150'
+
+    # Helps with memory pressure spikes when the game loads new areas
+    'vm.watermark_boost_factor = 0'
+    'vm.watermark_scale_factor = 125'
+
+    # Lower latency for games (stops the kernel from trying to read 'extra' swap pages)
+    #'vm.page-cluster = 0 # Setting this to 0 helps latency, but increases I/O overhead with small frequent read/writes.'
+)
+
+# CachyOS specific ZRAM parameter configuration (udev rules)
+# Since CachyOS the regular zram_params_config config path (/etc/sysctl.d/99-vm-zram-parameters.conf)
+# won't work, we'll use CachyOS own config file (via udev, not via sysctl)
+zram_params_config_cachy=(
+    '# When used with ZRAM, it is better to prefer page out only anonymous pages,'
+    '# because it ensures that they do not go out of memory, but will be just'
+    '# compressed. If we do frequent flushing of file pages, that increases the'
+    '# percentage of page cache misses, which in the long term gives additional'
+    '# cycles to re-read the same data from disk that was previously in page cache.'
+    '# This is the reason why it is recommended to use high values from 100 to keep'
+    '# the page cache as hermetic as possible, because otherwise it is "expensive"'
+    '# to read data from disk again. At the same time, uncompressing pages from ZRAM'
+    '# is not as expensive and is usually very fast on modern CPUs.'
+    '#'
+    '# Also it is better to disable Zswap, as this may prevent ZRAM from working'
+    '# properly or keeping a proper count of compressed pages via zramctl.'
+    'ACTION=="change", KERNEL=="zram0", ATTR{initstate}=="1", SYSCTL{vm.swappiness}="125", \'
+    '    RUN+="/bin/sh -c '\''echo N > /sys/module/zswap/parameters/enabled'\''"'
 )
 
 
@@ -703,7 +749,7 @@ EOF'
 }
 
 # Function to install and configure ZRAM
-install_configure_zram() {
+enable_zram() {
     echo
     echo -e "${BLUE}Do you want to install and configure ZRAM${NC}"
     echo -e "1) Configure zstd compression ${RED}(has better compression ratio)${NC}"
@@ -726,28 +772,34 @@ install_configure_zram() {
             ;;
     esac
 
+    # CachyOS detection and path configuration
+    local generator_path="/etc/systemd/zram-generator.conf"
+    local params_path="/etc/sysctl.d/99-vm-zram-parameters.conf"
+    local par_config=("${zram_params_config[@]}")
+
+    if grep -q "cachyos" /etc/os-release; then
+        echo -e "${YELLOW}CachyOS detected, using optimized configuration...${NC}"
+        params_path="/etc/udev/rules.d/30-zram.rules"
+        par_config=("${zram_params_config_cachy[@]}")
+    fi
+
     echo "Installing and configuring ZRAM with $compression_algo compression..."
 
     if ! yay -Qq zram-generator > /dev/null 2>&1; then
-        yay -S --noconfirm zram-generator
+        yay -Sy --noconfirm zram-generator
     fi
 
-    sudo bash -c "cat << EOF > /etc/systemd/zram-generator.conf
-[zram0]
-zram-size = ram / 2
-# Dedicate half of my RAM to ZRAM because dedicating 100% of it is not ideal
-compression-algorithm = $compression_algo
-swap-priority = 100
-fs-type = swap
-#writeback-device=/dev/nvme0n1p5
-EOF"
+    # Write generator configuration
+    printf "%s\n" "${zram_config[@]}" | sed "s/%ALGO%/$compression_algo/g" | sudo tee "$generator_path" > /dev/null
 
-    sudo bash -c 'cat << EOF > /etc/sysctl.d/99-vm-zram-parameters.conf
-vm.swappiness = 10 # keep swappiness to as low as possible to priotize RAM over Swapping
-#vm.watermark_boost_factor = 0
-#vm.watermark_scale_factor = 125
-#vm.page-cluster = 0 # Setting this to 0 helps latency, but increases I/O overhead with small frequent read/writes.
-EOF'
+    # Write sysctl/udev configuration
+    printf "%s\n" "${par_config[@]}" | sudo tee "$params_path" > /dev/null
+
+    if grep -q "cachyos" /etc/os-release; then
+        echo -e "${YELLOW}Applying ZRAM changes...${NC}"
+        sudo systemctl stop systemd-zram-setup@zram0.service
+        sudo systemctl start systemd-zram-setup@zram0.service
+    fi
 
     echo -e "${GREEN}ZRAM configuration completed.${NC}"
 
@@ -911,6 +963,13 @@ disable_zswap() {
 disable_zram() {
     echo "Disabling zram..."
 
+    if grep -q "cachyos" /etc/os-release; then
+        echo -e "${YELLOW}CachyOS detected, disabling zram service and removing files...${NC}"
+        sudo systemctl disable --now systemd-zram-setup@zram0.service
+        # sudo swapoff /dev/zram0
+        [ -f /etc/udev/rules.d/30-zram.rules ] && sudo rm /etc/udev/rules.d/30-zram.rules
+    fi
+
     # Disable zRAM devices only
     for zram_device in $(sudo swapon --show=NAME | grep '/dev/zram'); do
         sudo swapoff "$zram_device"
@@ -923,6 +982,12 @@ disable_zram() {
             echo "$zram_device has been disabled, but zram-generator.conf was not found."
         fi
     done
+
+    # Remove standard sysctl config
+    if [ -f /etc/sysctl.d/99-vm-zram-parameters.conf ]; then
+        sudo rm /etc/sysctl.d/99-vm-zram-parameters.conf
+        echo "Standard zram parameters removed."
+    fi
 }
 
 # Main function to handle memory configuration
@@ -950,7 +1015,7 @@ z_memory() {
                 echo "Swapfile removed."
             fi
 
-            install_configure_zram
+            enable_zram
             ;;
         2)
             # Disable ZRAM if active
