@@ -2,11 +2,11 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="0.9.8.1"
+iteration="0.9.9"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
-flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave exa lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest gemini-cli signal-desktop darkly-bin hmcl-beta-bin xorg-xeyes  # plasma-x11-session quickemu chatgpt-desktop-bin keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager signal-desktop jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass haguichi vesktop piper
+flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest gemini-cli signal-desktop darkly-bin hmcl-beta-bin xorg-xeyes  # plasma-x11-session quickemu chatgpt-desktop-bin keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager signal-desktop jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass haguichi vesktop piper
 )
 
 prog_packages=(
@@ -28,7 +28,7 @@ mhash aircrack-ng socat binwalk
 sleuthkit mitmproxy #maltego
 )
 
-gaming_dependencies=(
+gaming_packages=(
 wine-staging winetricks lib32-vulkan-icd-loader vkbasalt lib32-vkbasalt
 mangohud-git lib32-mangohud-git goverlay-git gamemode lib32-gamemode lutris latencyflex-bin #
 heroic-games-launcher-bin ttf-arimo-nerd lib32-freetype2 freetype2
@@ -82,10 +82,10 @@ shell_config=(
     'alias scdun="systemctl disable --user --now"'
     'alias scr="systemctl restart"'
     'alias scru="systemctl restart --user"'
-    'alias lt="exa -T"'
-    'alias la="exa -la"'
-    'alias l="exa"'
-    'alias ls="exa"'
+    'alias lt="eza -T"'
+    'alias la="eza -la"'
+    'alias l="eza"'
+    'alias ls="eza"'
     'alias nested="QT_QPA_PLATFORM=wayland dbus-launch -- kwin_wayland plasmashell"'
     'alias fwine="firejail --profile=/etc/firejail/wine.profile wine"'
     'alias fwinecfg="firejail --profile=/etc/firejail/wine.profile winecfg"'
@@ -171,6 +171,30 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 YELLOW='\033[38;5;226m'
 
+# Helper: prompt y/n with consistent lowercase handling
+# Usage: if confirm "prompt text"; then ...
+confirm() {
+    local choice
+    echo -ne "$1 (y/n): "
+    read choice
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
+    [[ "$choice" == "y" || "$choice" == "yes" ]]
+}
+
+# Helper: install packages from an array (handles both AUR and official via yay)
+# All queries use pacman -Qq (local db only)
+# Usage: install_pkg_list "${array[@]}"
+install_pkg_list() {
+    for pkg in "$@"; do
+        if pacman -Qq "$pkg" > /dev/null 2>&1; then
+            echo -e "$pkg ${GREEN}is already installed.${NC}"
+        else
+            echo "$pkg is not installed. Installing..."
+            yay -Sy --noconfirm "$pkg"
+        fi
+    done
+}
+
 logo() {
     echo -e ""
     echo -e "${BOLD}EOS Post install script ver ${iteration}${NC}"
@@ -180,16 +204,9 @@ logo() {
 
 update_mirrorlist() {
     echo
-    printf "${BLUE}Do you want to update mirrorlist${RED} (recommended at least once)${NC}? (y/n): "
-    read choice
-
-    # Convert choice to lowercase for consistency
-    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]')
-
-    if [[ "$choice" == "y" || "$choice" == "yes" ]]; then
-        local countries="BR,US"
-
-        local temp_file=$(mktemp)
+    if confirm "${BLUE}Do you want to update mirrorlist${RED} (recommended at least once)${NC}?"; then
+        local temp_file
+        temp_file=$(mktemp)
 
         # Check if we're running Manjaro
         if grep -q "Manjaro" /etc/os-release; then
@@ -199,11 +216,11 @@ update_mirrorlist() {
         else
             # Otherwise, update Arch/EndeavourOS mirrors
             echo -e "${YELLOW}Updating Arch Linux repositories, please wait... ${NC}"
-            reflector --verbose -c $countries --protocol https --sort rate --latest 10 --download-timeout 3 --threads 5 --save $temp_file
+            reflector --verbose -c "$countries" --protocol https --sort rate --latest 10 --download-timeout 3 --threads 5 --save "$temp_file"
 
-            sudo cp $temp_file /etc/pacman.d/mirrorlist
+            sudo cp "$temp_file" /etc/pacman.d/mirrorlist
 
-            rm $temp_file
+            rm "$temp_file"
 
             echo -e "${GREEN}Updated /etc/pacman.d/mirrorlist with the top 10 Arch Linux mirrors in $countries.${NC}"
 
@@ -220,15 +237,9 @@ update_mirrorlist() {
 
 updatesys() {
     echo
-    printf "${BLUE}Do you want to update your system${RED} (Highly advised after install — skipping may break the system)${NC}? (y/n): "
-    read choice
-
-    if [[ "$choice" == "y" ]]; then
-        # Install 'archlinux-keyring' if not already installed
-      #  if ! yay -Qq | grep -qw "archlinux-keyring"; then
-            echo "Installing archlinux-keyring..."
-            yay -Sy --noconfirm archlinux-keyring
-     #   fi
+    if confirm "${BLUE}Do you want to update your system${RED} (Highly advised after install — skipping may break the system)${NC}?"; then
+        echo "Installing archlinux-keyring..."
+        yay -Sy --noconfirm archlinux-keyring
 
         # Update system
         echo "Updating system..."
@@ -240,9 +251,7 @@ updatesys() {
 
 configure_chaotic_aur() {
     echo
-    printf "${BLUE}Do you want to configure Chaotic AUR ${RED}(recommended)${NC}? (y/n): "
-    read choice1
-    if [[ "$choice1" == "y" ]]; then
+    if confirm "${BLUE}Do you want to configure Chaotic AUR ${RED}(recommended)${NC}?"; then
         # Check if [chaotic-aur] section exists and comment it out if necessary
         if grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
             # Comment out the [chaotic-aur] section
@@ -259,7 +268,6 @@ configure_chaotic_aur() {
             echo "chaotic-keyring is not installed. Installing..."
             sudo rm -rf /etc/pacman.d/chaotic*
             sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
-            #sudo pacman -Sy
         else
             echo -e "${GREEN}chaotic-keyring is already installed.${NC}"
         fi
@@ -277,7 +285,7 @@ configure_chaotic_aur() {
         if [ ! -r /etc/pacman.d/chaotic-mirrorlist ]; then
             echo "Error: /etc/pacman.d/chaotic-mirrorlist could not be read or does not exist."
             echo "Please ensure the file exists and is readable before configuring Chaotic AUR."
-            exit 1
+            return 1
         fi
 
         # Check if [chaotic-aur] section should be uncommented
@@ -297,7 +305,7 @@ EOF'
                 echo "Chaotic AUR is already configured in /etc/pacman.conf."
             fi
         fi
-        else
+    else
         echo "Skipping Chaotic AUR configuration..."
     fi
 }
@@ -312,12 +320,13 @@ backup_system() {
     echo -e "${BLUE}Do you want to install a backup system?${NC} "
     echo -e "1. Install ${ORANGE}Timeshift ${NC}(simpler to use)"
     echo -e "2. Install ${ORANGE}Btrfs Assistant ${NC}(advanced, but requires BTRFS fs)"
+    echo -e "0. Skip"
 
-    read -p "Enter your choice [1-2]: " choice
+    read -p "Enter your choice [0-2]: " choice
 
-    case $choice in
+    case "$choice" in
         1)
-            if yay -Qq timeshift &> /dev/null; then
+            if pacman -Qq timeshift &> /dev/null; then
                 echo -e "Timeshift ${GREEN}is already installed.${NC}"
             else
                 echo "Installing Timeshift..."
@@ -330,15 +339,18 @@ backup_system() {
                 return
             fi
 
-            if yay -Qq btrfs-assistant &> /dev/null; then
+            if pacman -Qq btrfs-assistant &> /dev/null; then
                 echo -e "${GREEN}Btrfs Assistant is already installed.${NC}"
             else
                 echo "Installing Btrfs Assistant..."
                 sudo pacman -S --noconfirm btrfs-assistant boost-libs
             fi
             ;;
+        0)
+            echo "Skipping backup system installation..."
+            ;;
         *)
-            echo -e "${YELLOW}Invalid choice. Please enter 1 or 2.${NC}"
+            echo -e "${YELLOW}Invalid choice. Please enter 0, 1, or 2.${NC}"
             ;;
     esac
 }
@@ -349,11 +361,12 @@ install_gui_store() {
     echo -e "1) Install ${ORANGE}Pamac${NC} (Native and Flatpak) ${RED}(recommended)${NC}"
     echo -e "2) Install ${ORANGE}Discover${NC} (Flatpak packages only)${NC}"
     echo -e "3) Install ${ORANGE}Octopi${NC} (Native packages only)${NC}"
-    read -p "Please choose an option (1, 2, or 3): " choice
+    echo -e "0) Skip"
+    read -p "Please choose an option (0-3): " choice
 
     case "$choice" in
         1)
-            if ! yay -Qq pamac-flatpak &>/dev/null; then
+            if ! pacman -Qq pamac-flatpak &>/dev/null; then
                 echo "Installing Pamac..."
                 yay -Sy --noconfirm pamac-flatpak
             else
@@ -361,23 +374,26 @@ install_gui_store() {
             fi
             ;;
         2)
-            if ! yay -Qq discover &>/dev/null; then
+            if ! pacman -Qq discover &>/dev/null; then
                 echo "Installing Discover..."
-                yay -Sy --noconfirm discover
+                sudo pacman -Sy --noconfirm discover
             else
                 echo -e "${GREEN}Discover is already installed.${NC}"
             fi
             ;;
         3)
-            if ! yay -Qq octopi &>/dev/null; then
+            if ! pacman -Qq octopi &>/dev/null; then
                 echo "Installing Octopi..."
                 yay -Sy --noconfirm octopi
             else
                 echo -e "${GREEN}Octopi is already installed.${NC}"
             fi
             ;;
+        0)
+            echo "Skipping GUI store installation..."
+            ;;
         *)
-            echo -e "${YELLOW}Invalid choice. Please select 1, 2, or 3.${NC}"
+            echo -e "${YELLOW}Invalid choice. Please select 0-3.${NC}"
             return 1
             ;;
     esac
@@ -386,27 +402,16 @@ install_gui_store() {
 # Function to install other software
 install_other_software() {
     echo
-    printf "${BLUE}Do you want to install other software?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
-            for pkg in "${packages[@]}"; do
-        if yay -Qq "$pkg" > /dev/null 2>&1; then
-            echo -e "$pkg ${GREEN}is already installed.${NC}"
-        else
-            echo "$pkg is not installed. Installing..."
-            yay -Sy --noconfirm "$pkg"
-        fi
-    done
-        else
-        echo "Skipping instalation of other software..."
+    if confirm "${BLUE}Do you want to install other software?${NC}"; then
+        install_pkg_list "${packages[@]}"
+    else
+        echo "Skipping installation of other software..."
     fi
 }
 
 install_flatpak_apps() {
     echo
-    printf "${BLUE}Do you want to install Flatpak applications?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm "${BLUE}Do you want to install Flatpak applications?${NC}"; then
         echo -e "${YELLOW}Installing Flatpak applications...${NC}"
         for app in "${flatpak_apps[@]}"; do
             # Check if the app is already installed (system or user)
@@ -438,112 +443,62 @@ install_flatpak_apps() {
 # Function to install programming software
 install_prog_software() {
     echo
-    printf "${BLUE}Do you want to install programming/debugging software?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
-            for pkg in "${prog_packages[@]}"; do
-        if yay -Qq "$pkg" > /dev/null 2>&1; then
-            echo -e "$pkg ${GREEN}is already installed.${NC}"
-        else
-            echo "$pkg is not installed. Installing..."
-            yay -Sy --noconfirm "$pkg"
-        fi
-    done
-        else
+    if confirm "${BLUE}Do you want to install programming/debugging software?${NC}"; then
+        install_pkg_list "${prog_packages[@]}"
+    else
         echo "Skipping programming software installation..."
     fi
 }
 
 install_network_tools() {
     echo
-    printf "${BLUE}Do you want to install network/pentest tools?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
-
-        for pkg in "${pentest_packages[@]}"; do
-            if yay -Qq "$pkg" > /dev/null 2>&1; then
-                echo -e "$pkg ${GREEN}is already installed.${NC}"
-            else
-                echo "$pkg is not installed. Installing..."
-                yay -Sy --noconfirm "$pkg"
-            fi
-        done
-            else
-        echo "Skipping network/pentest tools instalation..."
+    if confirm "${BLUE}Do you want to install network/pentest tools?${NC}"; then
+        install_pkg_list "${pentest_packages[@]}"
+    else
+        echo "Skipping network/pentest tools installation..."
     fi
 }
 
-gaming_dependencies() {
+install_gaming_deps() {
     echo
-    printf "${BLUE}Do you want to install gaming dependencies?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
-            for pkg in "${gaming_dependencies[@]}"; do
-        if yay -Qq "$pkg" > /dev/null 2>&1; then
-            echo -e "$pkg ${GREEN}is already installed.${NC}"
-        else
-            echo "$pkg is not installed. Installing..."
-            yay -Sy --noconfirm "$pkg"
-        fi
-    done
-        else
-        echo "Skipping gaming dependencies instalation..."
+    if confirm "${BLUE}Do you want to install gaming dependencies?${NC}"; then
+        install_pkg_list "${gaming_packages[@]}"
+    else
+        echo "Skipping gaming dependencies installation..."
     fi
 }
 
 choose_driver_installation() {
     # Sub-function to install RADV drivers
     install_radv_drivers() {
-
-        radv_packages=(
+        local radv_packages=(
             "vulkan-radeon" "lib32-vulkan-radeon"
         )
-
-        for pkg in "${radv_packages[@]}"; do
-            if yay -Qq "$pkg" > /dev/null 2>&1; then
-                echo -e "$pkg ${GREEN}is already installed.${NC}"
-            else
-                echo "$pkg is not installed. Installing..."
-                yay -Sy --noconfirm "$pkg"
-            fi
-        done
+        install_pkg_list "${radv_packages[@]}"
     }
 
     # Sub-function to install NVIDIA drivers
     install_nvidia_drivers() {
-
-        nvidia_packages=(
+        local nvidia_packages=(
             "nvidia-utils" "lib32-nvidia-utils" "nvidia" "nvidia-dkms" "nvidia-settings"
         )
-
-        for pkg in "${nvidia_packages[@]}"; do
-            if yay -Qq "$pkg" > /dev/null 2>&1; then
-                echo -e "$pkg ${GREEN}is already installed.${NC}"
-            else
-                echo "$pkg is not installed. Installing..."
-                yay -Sy --noconfirm "$pkg"
-            fi
-        done
-    }
-
-    # Sub-function to handle installing both RADV and Nvidia drivers
-    install_both_drivers() {
-        install_radv_drivers
-        install_nvidia_drivers
+        install_pkg_list "${nvidia_packages[@]}"
     }
 
     echo
     echo -e "${BLUE}Which drivers do you want to install? ${NC}"
-    echo -e "1. ${RED}RADV AMD drivers${NC}" # Red color for RADV
+    echo -e "1. ${RED}RADV AMD drivers${NC}"
     echo -e "2. ${LIGHT_GREEN}NVIDIA Proprietary ${NC}drivers"
     echo -e "3. Both ${RED}RADV ${NC}and ${LIGHT_GREEN}NVIDIA ${NC}drivers"
+    echo -e "0. Skip"
 
-    read -p "Please choose an option (1, 2, 3): " choice
-    case $choice in
+    read -p "Please choose an option (0-3): " choice
+    case "$choice" in
         1) install_radv_drivers ;;
         2) install_nvidia_drivers ;;
-        3) install_both_drivers ;;
-        *) echo -e "${YELLOW}Invalid choice. Please enter a number between 1 and 3.${NC}" ;;
+        3) install_radv_drivers; install_nvidia_drivers ;;
+        0) echo "Skipping driver installation..." ;;
+        *) echo -e "${YELLOW}Invalid choice. Please enter a number between 0 and 3.${NC}" ;;
     esac
 }
 
@@ -551,174 +506,167 @@ install_shell() {
 
     # Sub-function to install and configure ZSH
     install_zsh() {
-            if ! yay -Qq | grep -q "^zsh$"; then
-                echo "Installing ZSH..."
-                yay -Sy --noconfirm zsh
-            else
-                echo -e "ZSH ${GREEN}is already installed.${NC}"
+        if ! pacman -Qq zsh > /dev/null 2>&1; then
+            echo "Installing ZSH..."
+            sudo pacman -Sy --noconfirm zsh
+        else
+            echo -e "ZSH ${GREEN}is already installed.${NC}"
+        fi
+
+        if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+            echo "Installing Oh My Zsh..."
+            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+        else
+            echo -e "Oh My Zsh ${GREEN}is already installed.${NC}"
+        fi
+
+        if [[ "$SHELL" != "$(which zsh)" ]]; then
+            echo "Changing the default shell to ZSH..."
+            chsh -s "$(which zsh)"
+        else
+            echo "ZSH is already the default shell."
+        fi
+
+        ZSH_CONFIG_FILE="$HOME/.zshrc"
+
+        # Add shell_config to .zshrc
+        for setting in "${shell_config[@]}"; do
+            if ! grep -qF "$setting" "$ZSH_CONFIG_FILE"; then
+                echo "$setting" >> "$ZSH_CONFIG_FILE"
             fi
+        done
 
-            if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-                echo "Installing Oh My Zsh..."
-                wget --no-check-certificate http://install.ohmyz.sh -O - | sh
-            else
-                echo -e "Oh My Zsh ${GREEN}is already installed.${NC}"
-            fi
+        ZSH_AUTOSUGGESTIONS_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+        if [[ ! -d "$ZSH_AUTOSUGGESTIONS_DIR" ]]; then
+            echo "Installing zsh-autosuggestions plugin..."
+            git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR"
+        else
+            echo -e "zsh-autosuggestions ${GREEN}plugin is already installed.${NC}"
+        fi
 
-            if [[ "$SHELL" != "$(which zsh)" ]]; then
-                echo "Changing the default shell to ZSH..."
-                chsh -s "$(which zsh)"
-            else
-                echo "ZSH is already the default shell."
-            fi
+        # Install zsh-syntax-highlighting
+        ZSH_SYNTAX_HIGHLIGHTING_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
+        if [[ ! -d "$ZSH_SYNTAX_HIGHLIGHTING_DIR" ]]; then
+            echo "Installing zsh-syntax-highlighting plugin..."
+            git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR"
+        else
+            echo -e "zsh-syntax-highlighting ${GREEN}plugin is already installed.${NC}"
+        fi
 
-            ZSH_CONFIG_FILE="$HOME/.zshrc"
+        # Install fzf
+        if ! pacman -Qq fzf > /dev/null 2>&1; then
+            echo "Installing fzf..."
+            sudo pacman -Sy --noconfirm fzf
+        else
+            echo -e "fzf ${GREEN}is already installed.${NC}"
+        fi
 
-            # Add shell_config to .zshrc
-            for setting in "${shell_config[@]}"; do
-                if ! grep -q "$setting" "$ZSH_CONFIG_FILE"; then
-                    echo "$setting" >> "$ZSH_CONFIG_FILE"
-                fi
-            done
-
-            ZSH_AUTOSUGGESTIONS_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
-            if [[ ! -d "$ZSH_AUTOSUGGESTIONS_DIR" ]]; then
-                echo "Installing zsh-autosuggestions plugin..."
-                git clone https://github.com/zsh-users/zsh-autosuggestions "$ZSH_AUTOSUGGESTIONS_DIR"
-            else
-                echo -e "zsh-autosuggestions ${GREEN}plugin is already installed.${NC}"
-            fi
-
-            # Install zsh-syntax-highlighting
-            ZSH_SYNTAX_HIGHLIGHTING_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
-            if [[ ! -d "$ZSH_SYNTAX_HIGHLIGHTING_DIR" ]]; then
-                echo "Installing zsh-syntax-highlighting plugin..."
-                git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$ZSH_SYNTAX_HIGHLIGHTING_DIR"
-            else
-                echo -e "zsh-syntax-highlighting ${GREEN}plugin is already installed.${NC}"
-            fi
-
-            # Install fzf
-            if ! command -v fzf &> /dev/null; then
-                echo "Installing fzf..."
-                yay -Sy --noconfirm fzf
-            else
-                echo -e "fzf ${GREEN}is already installed.${NC}"
-            fi
-
-           # echo "Configuring ZSH with fzf..."
-            # Add fzf key bindings to .zshrc if not already present
-            if ! grep -q 'bindkey.*fzf-history-widget' "$ZSH_CONFIG_FILE"; then
-                cat << 'EOF' >> "$ZSH_CONFIG_FILE"
+        # Add fzf key bindings to .zshrc if not already present
+        if ! grep -q 'bindkey.*fzf-history-widget' "$ZSH_CONFIG_FILE"; then
+            cat << 'EOF' >> "$ZSH_CONFIG_FILE"
 export FZF_DEFAULT_OPTS="--height 40% --reverse --border --preview 'echo {}' --bind 'ctrl-r:reload(history 1),ctrl-y:accept'"
 bindkey '^R' fzf-history-widget
 source /usr/share/fzf/key-bindings.zsh
 EOF
-            fi
+        fi
 
-            # Add plugins to .zshrc if not already present
-            if ! grep -q "plugins=(.*zsh-autosuggestions.*)" "$ZSH_CONFIG_FILE"; then
-                sed -i '/^plugins=(/ s/)/ zsh-autosuggestions zsh-syntax-highlighting)/' "$ZSH_CONFIG_FILE"
-            fi
+        # Add plugins to .zshrc if not already present
+        if ! grep -q "plugins=(.*zsh-autosuggestions.*)" "$ZSH_CONFIG_FILE"; then
+            sed -i '/^plugins=(/ s/)/ zsh-autosuggestions zsh-syntax-highlighting)/' "$ZSH_CONFIG_FILE"
+        fi
 
-            # Add ZSH_AUTOSUGGEST_STRATEGY to .zshrc
-            if ! grep -q '^ZSH_AUTOSUGGEST_STRATEGY=' "$ZSH_CONFIG_FILE"; then
-                echo 'ZSH_AUTOSUGGEST_STRATEGY=(history completion)' >> "$ZSH_CONFIG_FILE"
-            fi
+        # Add ZSH_AUTOSUGGEST_STRATEGY to .zshrc
+        if ! grep -q '^ZSH_AUTOSUGGEST_STRATEGY=' "$ZSH_CONFIG_FILE"; then
+            echo 'ZSH_AUTOSUGGEST_STRATEGY=(history completion)' >> "$ZSH_CONFIG_FILE"
+        fi
 
-            # Set the theme to agnoster
-            if ! grep -q '^ZSH_THEME=' "$ZSH_CONFIG_FILE"; then
-                echo 'ZSH_THEME="agnoster"' >> "$ZSH_CONFIG_FILE"
-            else
-                sed -i 's/^ZSH_THEME=.*/ZSH_THEME="agnoster"/' "$ZSH_CONFIG_FILE"
-            fi
+        # Set the theme to agnoster
+        if ! grep -q '^ZSH_THEME=' "$ZSH_CONFIG_FILE"; then
+            echo 'ZSH_THEME="agnoster"' >> "$ZSH_CONFIG_FILE"
+        else
+            sed -i 's/^ZSH_THEME=.*/ZSH_THEME="agnoster"/' "$ZSH_CONFIG_FILE"
+        fi
 
-            echo -e "${GREEN}ZSH installation and configuration complete.${NC}"
+        echo -e "${GREEN}ZSH installation and configuration complete.${NC}"
     }
 
     # Sub-function to install and configure FISH
     install_fish() {
-    # Check if fish is installed
-    if pacman -Qs fish >/dev/null 2>&1; then
-        echo -e "${GREEN}FISH is already installed.${NC}"
-    else
-        echo "Installing FISH..."
-        yay -Sy --noconfirm fish || { echo "Failed to install FISH"; exit 1; }
-    fi
-
-    # Check if starship is installed
-    if pacman -Qs starship >/dev/null 2>&1; then
-        echo -e "${GREEN}Starship is already installed.${NC}"
-    else
-        echo "Installing Starship..."
-        yay -Sy --noconfirm archlinux-keyring starship || { echo "Failed to install Starship"; exit 1; }
-    fi
-
-    # Check and set default shell
-    if [[ "$SHELL" != "$(which fish)" ]]; then
-        echo "Changing the default shell to FISH..."
-        chsh -s "$(which fish)" || { echo "Failed to change shell"; exit 1; }
-    else
-        echo -e "${GREEN}FISH is already the default shell.${NC}"
-    fi
-
-    FISH_CONFIG_FILE="$HOME/.config/fish/config.fish"
-
-    # Create fish config directory
-    mkdir -p "$HOME/.config/fish" || { echo "Failed to create fish config directory"; exit 1; }
-
-    # Check if Starship initialization line exists
-    if ! grep -qF "starship init fish | source" "$FISH_CONFIG_FILE"; then
-        echo "starship init fish | source" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Starship"; exit 1; }
-    fi
-
-    # Add shell_config to config.fish
-    for setting in "${shell_config[@]}"; do
-        if ! grep -qF "$setting" "$FISH_CONFIG_FILE"; then
-            echo "$setting" >> "$FISH_CONFIG_FILE" || { echo "Failed to add setting to config.fish"; exit 1; }
+        # Check if fish is installed
+        if pacman -Qq fish > /dev/null 2>&1; then
+            echo -e "${GREEN}FISH is already installed.${NC}"
+        else
+            echo "Installing FISH..."
+            sudo pacman -Sy --noconfirm fish || { echo "Failed to install FISH"; return 1; }
         fi
-    done
 
-    # Configure Starship
-    echo "Configuring Starship..."
-    starship preset gruvbox-rainbow -o ~/.config/starship.toml || { echo "Failed to configure Starship"; exit 1; }
+        # Check if starship is installed
+        if pacman -Qq starship > /dev/null 2>&1; then
+            echo -e "${GREEN}Starship is already installed.${NC}"
+        else
+            echo "Installing Starship..."
+            sudo pacman -Sy --noconfirm archlinux-keyring starship || { echo "Failed to install Starship"; return 1; }
+        fi
 
-    echo -e "${GREEN}FISH installation and configuration complete.${NC}"
-}
+        # Check and set default shell
+        if [[ "$SHELL" != "$(which fish)" ]]; then
+            echo "Changing the default shell to FISH..."
+            chsh -s "$(which fish)" || { echo "Failed to change shell"; return 1; }
+        else
+            echo -e "${GREEN}FISH is already the default shell.${NC}"
+        fi
+
+        FISH_CONFIG_FILE="$HOME/.config/fish/config.fish"
+
+        # Create fish config directory
+        mkdir -p "$HOME/.config/fish" || { echo "Failed to create fish config directory"; return 1; }
+
+        # Check if Starship initialization line exists
+        if ! grep -qF "starship init fish | source" "$FISH_CONFIG_FILE"; then
+            echo "starship init fish | source" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Starship"; return 1; }
+        fi
+
+        # Add shell_config to config.fish
+        for setting in "${shell_config[@]}"; do
+            if ! grep -qF "$setting" "$FISH_CONFIG_FILE"; then
+                echo "$setting" >> "$FISH_CONFIG_FILE" || { echo "Failed to add setting to config.fish"; return 1; }
+            fi
+        done
+
+        # Configure Starship
+        echo "Configuring Starship..."
+        starship preset gruvbox-rainbow -o ~/.config/starship.toml || { echo "Failed to configure Starship"; return 1; }
+
+        echo -e "${GREEN}FISH installation and configuration complete.${NC}"
+    }
 
     echo
     echo -e "${BLUE}Do you want to install and configure ${NC}ZSH ${BLUE}or ${NC}FISH ${BLUE}shell${NC}?"
     echo -e "1. ${ORANGE}ZSH${NC}"
     echo -e "2. ${ORANGE}FISH${NC}"
+    echo -e "0. Skip"
 
-    read -p "Please choose an option (1 or 2): " choice
+    read -p "Please choose an option (0-2): " choice
 
     case "$choice" in
-        1)
-            install_zsh
-            ;;
-        2)
-            install_fish
-            ;;
-        *)
-            echo -e "${YELLOW}Invalid choice. Please choose 1 or 2.${NC}"
-            ;;
+        1) install_zsh ;;
+        2) install_fish ;;
+        0) echo "Skipping shell installation..." ;;
+        *) echo -e "${YELLOW}Invalid choice. Please choose 0, 1, or 2.${NC}" ;;
     esac
 }
 
 alacritty() {
     echo
-    printf "${BLUE}Do you want to install and configure Alacritty?${NC} (y/n): "
-    read choice
-        if [[ "$choice" == "y" ]]; then
-        if yay -Qq alacritty > /dev/null 2>&1; then
+    if confirm "${BLUE}Do you want to install and configure Alacritty?${NC}"; then
+        if pacman -Qq alacritty > /dev/null 2>&1; then
             echo -e "alacritty ${GREEN}is already installed.${NC}"
         else
             echo "alacritty is not installed. Installing..."
-            yay -Sy --noconfirm "alacritty"
+            sudo pacman -Sy --noconfirm alacritty
         fi
-    mkdir -p $HOME/.config/alacritty/
-    bash -c 'cat  << EOF > $HOME/.config/alacritty/alacritty.toml
+        mkdir -p "$HOME/.config/alacritty/"
+        cat << 'EOF' > "$HOME/.config/alacritty/alacritty.toml"
     [mouse]
 bindings = [
 { mouse = "Right", action = "Copy" }
@@ -741,10 +689,10 @@ size = 12
 
 [cursor]
 style =  {blinking = "Always" }
-EOF'
+EOF
         echo -e "${GREEN}Alacritty successfully configured.${NC}"
-        else
-        echo "Skipping Alacritty instalation..."
+    else
+        echo "Skipping Alacritty installation..."
     fi
 }
 
@@ -785,8 +733,8 @@ enable_zram() {
 
     echo "Installing and configuring ZRAM with $compression_algo compression..."
 
-    if ! yay -Qq zram-generator > /dev/null 2>&1; then
-        yay -Sy --noconfirm zram-generator
+    if ! pacman -Qq zram-generator > /dev/null 2>&1; then
+        sudo pacman -Sy --noconfirm zram-generator
     fi
 
     # Write generator configuration
@@ -829,7 +777,7 @@ update_grub_zswap() {
             elif grep -q "^${parameter}='" "$grub_config"; then
                 sudo sed -i "s/^${parameter}='/&${zswap_params} /" "$grub_config"
             fi
-            
+
             # Cleanup double spaces if any
             sudo sed -i "s/  / /g" "$grub_config"
 
@@ -871,7 +819,7 @@ update_systemdboot_zswap() {
         fi
 
         # Regenerate the boot loader configuration
-        sudo kernel-install add $(uname -r) /boot/vmlinuz-$(uname -r)
+        sudo kernel-install add "$(uname -r)" "/boot/vmlinuz-$(uname -r)"
         echo "Bootloader configuration updated."
     else
         echo "File /etc/kernel/cmdline does not exist. Please ensure you are using systemd-boot."
@@ -884,11 +832,6 @@ configure_swap() {
     # Subfunction to check if Btrfs is used
     is_btrfs() {
         sudo mount | grep -q 'type btrfs'
-    }
-
-    # Subfunction to check if swap is active
-    is_swap_active() {
-        sudo swapon --show | grep -q 'swap'
     }
 
     # Prompt user for the swap file size
@@ -927,7 +870,7 @@ configure_swap() {
 
     # Add swap entry to /etc/fstab if not already present
     if ! sudo grep -q '/swapfile' /etc/fstab; then
-        echo "/swapfile                                 /swap          swap    defaults  0 0" | sudo tee -a /etc/fstab
+        echo "/swapfile                                 none           swap    defaults  0 0" | sudo tee -a /etc/fstab
     fi
 
     echo -e "${GREEN}Swap file of size $swap_size created and activated.${NC}"
@@ -943,7 +886,7 @@ disable_zswap() {
         sudo sed -i "s/zswap\.compressor=[^ ]* //g; s/zswap\.compressor=[^ ]*$//g" /etc/kernel/cmdline
         sudo sed -i "s/zswap\.max_pool_percent=[^ ]* //g; s/zswap\.max_pool_percent=[^ ]*$//g" /etc/kernel/cmdline
         sudo sed -i "s/zswap\.zpool=[^ ]* //g; s/zswap\.zpool=[^ ]*$//g" /etc/kernel/cmdline
-        sudo kernel-install add $(uname -r) /boot/vmlinuz-$(uname -r)
+        sudo kernel-install add "$(uname -r)" "/boot/vmlinuz-$(uname -r)"
         echo "Systemd-boot parameters updated."
     # Check for GRUB
     elif [ -f /etc/default/grub ]; then
@@ -966,7 +909,6 @@ disable_zram() {
     if grep -q "cachyos" /etc/os-release; then
         echo -e "${YELLOW}CachyOS detected, disabling zram service and removing files...${NC}"
         sudo systemctl disable --now systemd-zram-setup@zram0.service
-        # sudo swapoff /dev/zram0
         [ -f /etc/udev/rules.d/30-zram.rules ] && sudo rm /etc/udev/rules.d/30-zram.rules
     fi
 
@@ -997,7 +939,8 @@ z_memory() {
     echo -e "${BLUE}Please choose an option:${NC}"
     echo -e "1) Configure ${ORANGE}ZRAM${NC}"
     echo -e "2) Configure ${ORANGE}ZSWAP${NC}"
-    read -p "Please choose an option (1 or 2): " choice
+    echo -e "0) Skip"
+    read -p "Please choose an option (0-2): " choice
 
     case "$choice" in
         1)
@@ -1065,8 +1008,11 @@ z_memory() {
                 echo -e "${RED}Neither /etc/kernel/cmdline nor /etc/default/grub found. Skipping bootloader update...${NC}"
             fi
             ;;
+        0)
+            echo "Skipping memory configuration..."
+            ;;
         *)
-            echo -e "${YELLOW}Invalid choice. Please select 1 or 2.${NC}"
+            echo -e "${YELLOW}Invalid choice. Please select 0, 1, or 2.${NC}"
             return 1
             ;;
     esac
@@ -1074,192 +1020,18 @@ z_memory() {
     echo -e "${YELLOW}Please reboot to apply any changes.${NC}"
 }
 
-#TODO with the next steam beta update, the following script will become obsolete.
-configure_steam() {
-    echo
-    echo -e "${BLUE}Do you want to install and configure Steam?${NC}"
-    echo -e "${RED}You need to first log in to your account and then close Steam completely${NC}"
-
-    echo -e "1) Configure Steam Native setup ${RED}(recommended)${NC}"
-    echo -e "2) Configure Steam Flatpak setup (recommended only if you play EAC-protected games)"
-    read -p "Please choose an option (1 or 2): " choice
-
-    case "$choice" in
-        1)
-            echo -e "${YELLOW}Configuring Steam Native setup...${NC}"
-
-            # Install Steam and dependencies
-            if yay -Qq steam > /dev/null 2>&1; then
-                echo -e "${GREEN}Steam is already installed.${NC}"
-            else
-                echo -e "${YELLOW}Installing Steam...${NC}"
-                yay -Sy --noconfirm steam xdg-desktop-portal-gtk
-            fi
-
-            # Install MangoHud for performance overlay
-            if yay -Qq mangohud > /dev/null 2>&1; then
-                echo -e "${GREEN}MangoHud is already installed.${NC}"
-            else
-                echo -e "${YELLOW}Installing MangoHud...${NC}"
-                yay -Sy --noconfirm mangohud lib32-mangohud
-            fi
-
-            echo -e "${GREEN}Disabling Shader Pre-Cache, enabling Proton Experimental, and setting default tab to Library...${NC}"
-
-            steam_config_dir="$HOME/.local/share/Steam/config"
-            steam_userdata_dir="$HOME/.local/share/Steam/userdata"
-
-            # Ensure config directory exists
-            mkdir -p "$steam_config_dir"
-
-            # Modify config.vdf
-            config_file="$steam_config_dir/config.vdf"
-            if [ ! -f "$config_file" ]; then
-                echo -e "${YELLOW}Creating new config.vdf...${NC}"
-                echo -e "{\n\t\"Steam\" {}\n}" > "$config_file"
-            fi
-
-            # Add Proton Experimental
-            if ! grep -q "CompatToolMapping" "$config_file"; then
-                line_number=$(grep -n '"Rate"' "$config_file" | cut -d: -f1)
-                if [ -z "$line_number" ]; then
-                    line_number=$(wc -l < "$config_file")
-                fi
-                content='
-                    "CompatToolMapping"
-                    {
-                        "0"
-                        {
-                            "name"        "proton_experimental"
-                            "config"        ""
-                            "priority"        "75"
-                        }
-                    }
-                '
-                { head -n "$line_number" "$config_file"; echo "$content"; tail -n +$((line_number+1)) "$config_file"; } > temp.txt && mv temp.txt "$config_file"
-            fi
-
-            # Disable Shader Pre-Cache
-            if ! grep -q "DisableShaderCache" "$config_file"; then
-                line_number=$(grep -n 'CompatVideoTCMediaV1' "$config_file" | cut -d: -f1)
-                if [ -z "$line_number" ]; then
-                    line_number=$(wc -l < "$config_file")
-                fi
-                content='
-                        "DisableShaderCache"        "1"
-                '
-                { head -n "$line_number" "$config_file"; echo "$content"; tail -n +$((line_number+1)) "$config_file"; } | sed '/^$/d' > temp.txt && mv temp.txt "$config_file"
-            fi
-
-            # Set Library as default tab
-            if [ -d "$steam_userdata_dir" ]; then
-                for localconfig in "$steam_userdata_dir"/*/config/localconfig.vdf; do
-                    if [ -f "$localconfig" ]; then
-                        sed -i 's/"NotifyAvailableGames"\s*"\([0-9]\)"/"NotifyAvailableGames"     "0"/g' "$localconfig"
-                    fi
-                done
-            fi
-
-            echo -e "${GREEN}Steam Native configuration completed.${NC}"
-            ;;
-        2)
-            echo -e "${YELLOW}Configuring Steam Flatpak setup...${NC}"
-
-            # Install Steam and MangoHud via Flatpak
-            if flatpak list | grep -q "com.valvesoftware.Steam"; then
-                echo -e "${GREEN}Steam Flatpak is already installed.${NC}"
-            else
-                echo -e "${YELLOW}Installing Steam Flatpak...${NC}"
-                flatpak install -y app/com.valvesoftware.Steam/x86_64/stable
-            fi
-
-            if flatpak list | grep -q "org.freedesktop.Platform.VulkanLayer.MangoHud"; then
-                echo -e "${GREEN}MangoHud Flatpak is already installed.${NC}"
-            else
-                echo -e "${YELLOW}Installing MangoHud Flatpak...${NC}"
-                flatpak install -y runtime/org.freedesktop.Platform.VulkanLayer.MangoHud/x86_64/23.08
-            fi
-
-            # Fix MangoHud permissions
-            sudo flatpak override --filesystem=xdg-config/MangoHud:ro com.valvesoftware.Steam
-
-            echo -e "${GREEN}Disabling Shader Pre-Cache, enabling Proton Experimental, and setting default tab to Library...${NC}"
-
-            steam_flatpak_config="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/config/config.vdf"
-            steam_flatpak_userdata="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/userdata"
-
-            # Ensure config directory exists
-            mkdir -p "$(dirname "$steam_flatpak_config")"
-
-            # Modify config.vdf
-            if [ ! -f "$steam_flatpak_config" ]; then
-                echo -e "${YELLOW}Creating new config.vdf for Flatpak...${NC}"
-                echo -e "{\n\t\"Steam\" {}\n}" > "$steam_flatpak_config"
-            fi
-
-            # Add Proton Experimental
-            if ! grep -q "CompatToolMapping" "$steam_flatpak_config"; then
-                line_number=$(grep -n '"Rate"' "$steam_flatpak_config" | cut -d: -f1)
-                if [ -z "$line_number" ]; then
-                    line_number=$(wc -l < "$steam_flatpak_config")
-                fi
-                content='
-                    "CompatToolMapping"
-                    {
-                        "0"
-                        {
-                            "name"        "proton_experimental"
-                            "config"        ""
-                            "priority"        "75"
-                        }
-                    }
-                '
-                { head -n "$line_number" "$steam_flatpak_config"; echo "$content"; tail -n +$((line_number+1)) "$steam_flatpak_config"; } > temp.txt && mv temp.txt "$steam_flatpak_config"
-            fi
-
-            # Disable Shader Pre-Cache
-            if ! grep -q "DisableShaderCache" "$steam_flatpak_config"; then
-                line_number=$(grep -n 'CompatVideoTCMediaV1' "$steam_flatpak_config" | cut -d: -f1)
-                if [ -z "$line_number" ]; then
-                    line_number=$(wc -l < "$steam_flatpak_config")
-                fi
-                content='
-                        "DisableShaderCache"        "1"
-                '
-                { head -n "$line_number" "$steam_flatpak_config"; echo "$content"; tail -n +$((line_number+1)) "$steam_flatpak_config"; } | sed '/^$/d' > temp.txt && mv temp.txt "$steam_flatpak_config"
-            fi
-
-            # Set Library as default tab
-            if [ -d "$steam_flatpak_userdata" ]; then
-                for localconfig in "$steam_flatpak_userdata"/*/config/localconfig.vdf; do
-                    if [ -f "$localconfig" ]; then
-                        sed -i 's/"NotifyAvailableGames"\s*"\([0-9]\)"/"NotifyAvailableGames"     "0"/g' "$localconfig"
-                    fi
-                done
-            fi
-
-            echo -e "${GREEN}Steam Flatpak configuration completed.${NC}"
-            ;;
-        *)
-            echo -e "${YELLOW}Invalid choice. Please select 1 or 2.${NC}"
-            ;;
-    esac
-}
-
 remove_debounce() {
     echo
-    printf "${BLUE}Do you want to remove debounce/double click prevention ${RED}(recommended)${NC}? (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm "${BLUE}Do you want to remove debounce/double click prevention ${RED}(recommended)${NC}?"; then
         sudo mkdir -p /etc/libinput
         sudo bash -c 'cat << EOF > /etc/libinput/local-overrides.quirks
 [Never Debounce]
 MatchUdevType=mouse
 ModelBouncingKeys=1
 EOF'
-    echo -e "${GREEN}Debounce and double click prevention removed${NC}"
+        echo -e "${GREEN}Debounce and double click prevention removed${NC}"
     else
-    echo "Skipping debounce/double click prevention removal..."
+        echo "Skipping debounce/double click prevention removal..."
     fi
 }
 
@@ -1267,9 +1039,7 @@ enable_services() {
     echo
     echo -e "${BLUE}Do you want to enable services?${NC}"
     echo -e "It will enable the following services: ${ORANGE}${services[*]}${NC}"
-    printf "(y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm ""; then
         for service in "${services[@]}"; do
             # Check if the service is already enabled (system or user)
             if systemctl is-enabled "$service" &>/dev/null || systemctl --user is-enabled "$service" &>/dev/null; then
@@ -1300,53 +1070,31 @@ enable_services() {
 
 remove_packages() {
     echo
-    printf "${BLUE}Do you want to remove these packages?${NC} "
-    # Flush the output buffer
-    printf "\n"
-
     echo -e "It will remove the following packages: ${RED}${remove_packages[*]}${NC}"
-    printf "(y/n): "
-    read choice
-
-    if [[ "$choice" == "y" ]]; then
-    for pkg in "${remove_packages[@]}"; do
-        if yay -Qq "$pkg" > /dev/null 2>&1; then
-            echo "$pkg is installed. Removing..."
-            yay -R --noconfirm "$pkg"
-        else
-            echo "$pkg is not installed. Nothing to do."
-        fi
-    done
-        else
+    if confirm "${BLUE}Do you want to remove these packages?${NC}"; then
+        for pkg in "${remove_packages[@]}"; do
+            if pacman -Qq "$pkg" > /dev/null 2>&1; then
+                echo "$pkg is installed. Removing..."
+                sudo pacman -R --noconfirm "$pkg"
+            else
+                echo "$pkg is not installed. Nothing to do."
+            fi
+        done
+    else
         echo "Skipping package removal..."
     fi
 }
 
-configure_printer()
-{
+configure_printer() {
     echo
-    printf "${BLUE}Do you want to enable printer support?${NC} (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm "${BLUE}Do you want to enable printer support?${NC}"; then
         # Enable scan support
-        for pkg in "iscan" "iscan-data"; do # "iscan-plugin-network"
-            if ! yay -Qq "$pkg" > /dev/null 2>&1; then
-                echo "Installing $pkg..."
-                yay -Sy --noconfirm "$pkg"
-            else
-                echo -e "${GREEN}$pkg is already installed.${NC}"
-            fi
-        done
+        local scan_packages=("iscan" "iscan-data") # "iscan-plugin-network"
+        install_pkg_list "${scan_packages[@]}"
 
         # Enable printing support
-        for pkg in  "cups" "system-config-printer"; do # "epson-inkjet-printer-201101w"
-            if ! yay -Qq "$pkg" > /dev/null 2>&1; then
-                echo "Installing $pkg..."
-                yay -Sy --noconfirm "$pkg"
-            else
-                echo -e "${GREEN}$pkg is already installed.${NC}"
-            fi
-        done
+        local print_packages=("cups" "system-config-printer") # "epson-inkjet-printer-201101w"
+        install_pkg_list "${print_packages[@]}"
 
         # Enable and start the CUPS service
         sudo systemctl enable --now cups
@@ -1359,9 +1107,7 @@ configure_printer()
 # Function to enable user theme (most likely dark theme) into root
 darkmode_on_root() {
     echo
-    echo -e "${BLUE}Do you want to enable user theme into root${NC}? (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm "${BLUE}Do you want to enable user theme into root${NC}?"; then
         yay -Sy konsave
         konsave -s user && konsave -e user
         sudo konsave -i ~/user.knsv
@@ -1374,26 +1120,18 @@ bootloader_customizer() {
     echo
     echo -e "${BLUE}Do you want to configure and update the grub bootloader${NC}? "
     echo -e "- It will install ${ORANGE}grub-customizer${NC}, ${ORANGE}grub-btrfs${NC} and update the grub entries"
-    printf "(y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm ""; then
         if [ -d "/boot/grub" ]; then
             echo "GRUB detected."
-            for pkg in grub-customizer grub-btrfs; do
-                if yay -Qq "$pkg" > /dev/null 2>&1; then
-                    echo -e "$pkg ${GREEN}is already installed.${NC}"
-                else
-                    echo "$pkg is not installed. Installing..."
-                    yay -Sy --noconfirm "$pkg"
-                fi
-            done
+            local grub_packages=("grub-customizer" "grub-btrfs")
+            install_pkg_list "${grub_packages[@]}"
             sudo update-grub
-        elif sudo [ -d "/etc/kernel/cmdline" ] && [ "$(sudo ls -A /etc/kernel/cmdline)" ]; then
+        elif [ -f "/etc/kernel/cmdline" ]; then
             echo "systemd-boot detected. No action needed."
         else
             echo -e "${RED}Unknown bootloader. No action taken.${NC}"
         fi
-    elif [[ "$choice" != "y" ]]; then
+    else
         echo "Skipping grub configuration..."
     fi
 }
@@ -1401,9 +1139,7 @@ bootloader_customizer() {
 
 waydroid() {
     echo
-    printf "${BLUE}Do you want to install and configure Waydroid${NC}? (y/n): "
-    read choice
-    if [[ "$choice" == "y" ]]; then
+    if confirm "${BLUE}Do you want to install and configure Waydroid${NC}?"; then
         # Lock file to prevent multiple instances
         LOCK_FILE="/tmp/waydroid_script.lock"
         if [ -f "$LOCK_FILE" ]; then
@@ -1415,14 +1151,15 @@ waydroid() {
         touch "$LOCK_FILE"
         echo -e "${GREEN}Lock file created.${NC}"
 
-        # Trap to ensure lock file is removed and script exits on interrupt
-        trap 'echo -e "${RED}Interrupted. Removing lock file and exiting...${NC}"; rm -f "$LOCK_FILE"; exit 1' SIGINT SIGTERM
+        # Trap to ensure lock file is removed on interrupt
+        trap 'echo -e "${RED}Interrupted. Removing lock file...${NC}"; rm -f "$LOCK_FILE"; trap - SIGINT SIGTERM; return 1' SIGINT SIGTERM
 
         echo -e "${BLUE}Starting Waydroid setup...${NC}"
 
         # Step 1: Check if Waydroid and waydroid-script-git are installed
-        for pkg in "waydroid" "waydroid-script-git"; do
-            if yay -Qq "$pkg" > /dev/null 2>&1; then
+        local waydroid_packages=("waydroid" "waydroid-script-git")
+        for pkg in "${waydroid_packages[@]}"; do
+            if pacman -Qq "$pkg" > /dev/null 2>&1; then
                 echo -e "$pkg ${GREEN}is already installed.${NC}"
             else
                 echo -e "$pkg is not installed. Installing..."
@@ -1430,6 +1167,7 @@ waydroid() {
                 if [ $? -ne 0 ]; then
                     echo -e "${RED}Failed to install $pkg.${NC}"
                     rm -f "$LOCK_FILE"
+                    trap - SIGINT SIGTERM
                     return 1
                 fi
             fi
@@ -1444,19 +1182,19 @@ waydroid() {
             else
                 echo -e "${RED}Failed to initialize Waydroid.${NC}"
                 rm -f "$LOCK_FILE"
+                trap - SIGINT SIGTERM
                 return 1
             fi
         else
             echo -e "${GREEN}Waydroid is already initialized.${NC}"
-            printf "${BLUE}Do you want to reinitialize Waydroid${NC}? (y/n): "
-            read -r reinitialize
-            if [[ "$reinitialize" == "y" || "$reinitialize" == "Y" ]]; then
+            if confirm "${BLUE}Do you want to reinitialize Waydroid${NC}?"; then
                 echo -e "${YELLOW}Forcing Waydroid reinitialization...${NC}"
                 if sudo waydroid init -f -s GAPPS; then
                     echo -e "${GREEN}Waydroid reinitialized successfully.${NC}"
                 else
                     echo -e "${RED}Failed to reinitialize Waydroid.${NC}"
                     rm -f "$LOCK_FILE"
+                    trap - SIGINT SIGTERM
                     return 1
                 fi
             else
@@ -1496,10 +1234,10 @@ waydroid() {
 
         if ! systemctl is-active --quiet waydroid-container; then
             echo -e "${BLUE}Starting Waydroid service...${NC}"
-            sudo systemctl start waydroid-container
-            if [ $? -ne 0 ]; then
+            if ! sudo systemctl start waydroid-container; then
                 echo -e "${RED}Failed to start Waydroid service.${NC}"
                 rm -f "$LOCK_FILE"
+                trap - SIGINT SIGTERM
                 return 1
             fi
         else
@@ -1515,11 +1253,7 @@ waydroid() {
             echo -e "${GREEN}Waydroid session is already running.${NC}"
         fi
 
-        # Step 6: Show full UI
-        #echo -e "${BLUE}Showing full UI...${NC}"
-        #nohup waydroid show-full-ui > /dev/null 2>&1 &
-
-        # Step 7: Display Google registration instructions
+        # Step 6: Display Google registration instructions
         echo -e "${GREEN}Waydroid setup completed successfully.${NC}"
         echo -e "${YELLOW}Please register your device with Google:${NC}"
         echo -e "1. Run ${ORANGE}sudo waydroid shell${NC} to access the shell."
@@ -1527,8 +1261,13 @@ waydroid() {
         echo -e "${ORANGE}   ANDROID_RUNTIME_ROOT=/apex/com.android.runtime ANDROID_DATA=/data ANDROID_TZDATA_ROOT=/apex/com.android.tzdata ANDROID_I18N_ROOT=/apex/com.android.i18n sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select * from main where name = \\\"android_id\\\";\"${NC}"
         echo -e "3. ${NC}Copy the ID and paste it on:${BLUE} https://www.google.com/android/uncertified${NC}"
         echo -e "4. Run the following command upon registration: ${ORANGE}sudo systemctl restart waydroid-container.service${NC}"
+        echo -e "5. Run ${GREEN}waydroid show-full-ui${NC} to open Waydroid GUI."
+
+        # Clean up lock file and trap on success
+        rm -f "$LOCK_FILE"
+        trap - SIGINT SIGTERM
     else
-        echo -e "Skipping Waydroid installation and configuration...${NC}"
+        echo -e "Skipping Waydroid installation and configuration..."
     fi
 }
 
@@ -1537,129 +1276,149 @@ install_firewall() {
     echo -e "${BLUE}Do you want to install and enable a firewall manager?${NC}"
     echo -e "1) Install ${ORANGE}UFW${NC} (Uncomplicated Firewall) ${RED}(recommended)${NC}"
     echo -e "2) Install ${ORANGE}Firewalld${NC} (Dynamic firewall manager)${NC}"
-    read -p "Please choose an option (1, 2): " choice
+    echo -e "0) Skip"
+    read -p "Please choose an option (0-2): " choice
 
     case "$choice" in
         1)
-            if ! yay -Qq ufw &>/dev/null; then
+            if ! pacman -Qq ufw &>/dev/null; then
                 echo "Installing UFW..."
-                yay -Sy --noconfirm ufw
-                echo -e "${GREEN}Enabling services....${NC}"
-                sudo systemctl enable --now firewalld
-                sudo systemctl disable --now ufw
+                sudo pacman -Sy --noconfirm ufw
             else
                 echo -e "${GREEN}UFW is already installed.${NC}"
-                echo -e "${GREEN}Enabling services....${NC}"
-                sudo systemctl enable --now ufw
-                sudo systemctl disable --now firewalld
             fi
+            echo -e "${GREEN}Enabling UFW...${NC}"
+            sudo systemctl disable --now firewalld 2>/dev/null
+            sudo systemctl enable --now ufw
             ;;
         2)
-            if ! yay -Qq firewalld &>/dev/null; then
+            if ! pacman -Qq firewalld &>/dev/null; then
                 echo "Installing Firewalld..."
-                yay -Sy --noconfirm firewalld
-                echo -e "${GREEN}Enabling services....${NC}"
-                sudo systemctl enable --now firewalld
-                sudo systemctl disable --now ufw
+                sudo pacman -Sy --noconfirm firewalld
             else
                 echo -e "${GREEN}Firewalld is already installed.${NC}"
-                echo -e "${GREEN}Enabling services....${NC}"
-                sudo systemctl enable --now firewalld
-                sudo systemctl disable --now ufw
             fi
+            echo -e "${GREEN}Enabling Firewalld...${NC}"
+            sudo systemctl disable --now ufw 2>/dev/null
+            sudo systemctl enable --now firewalld
+            ;;
+        0)
+            echo "Skipping firewall installation..."
             ;;
         *)
-            echo -e "${YELLOW}Invalid choise. Please choose 1 or 2.${NC}"
+            echo -e "${YELLOW}Invalid choice. Please choose 0, 1, or 2.${NC}"
             ;;
     esac
 }
 
 setup_plymouth() {
-  echo -e "${BLUE}Checking if Plymouth is installed...${NC}"
-  if ! yay -Qq plymouth &>/dev/null; then
-    echo -e "${RED}Plymouth is not installed. Installing Plymouth...${NC}"
-    yay -Sy --noconfirm plymouth
-    echo -e "${GREEN}Plymouth has been installed.${NC}"
-  else
-    echo -e "${GREEN}Plymouth is already installed.${NC}"
-  fi
-
-  # Ask if the user wants a default or custom theme
-  echo -e "${BLUE}Do you want to choose a default theme or a custom one from AUR?${NC}"
-  echo -e "1) Choose a default theme"
-  echo -e "2) Set a custom theme from AUR (requires a valid theme package input)"
-  read -p "Please choose an option (1, 2): " choice
-
-  custom_theme_installed=false
-  default_theme_set=false
-  theme_changed=false  # Flag to track if any theme change happened
-
-  case "$choice" in
-    1)
-      echo -e "${BLUE}Listing available Plymouth themes:${NC}"
-      plymouth-set-default-theme -l
-
-      echo -e "${ORANGE}Enter the name of the Plymouth theme you want to set:${NC}"
-      read -r theme_name
-
-      if [[ -z "$theme_name" ]]; then
-        echo -e "${RED}No theme name entered. Skipping default theme setting...${NC}"
-      else
-        echo -e "${BLUE}Setting Plymouth theme to ${ORANGE}'$theme_name'${NC}..."
-        sudo plymouth-set-default-theme "$theme_name"
-
-        echo -e "${BLUE}Updating /etc/plymouth/plymouthd.conf...${NC}"
-        sudo sed -i "s/^#Theme=/Theme=$theme_name/" /etc/plymouth/plymouthd.conf
-        default_theme_set=true
-        theme_changed=true
-      fi
-      ;;
-    2)
-    echo -e "${ORANGE}Enter the package name for the custom theme (e.g., plymouth-theme-endeavouros):${NC}"
-    read -r package_name
-
-    if [[ -z "$package_name" ]]; then
-        echo -e "${RED}No package name entered. Skipping custom theme installation...${NC}"
-        custom_theme_installed=false
+    echo -e "${BLUE}Checking if Plymouth is installed...${NC}"
+    if ! pacman -Qq plymouth &>/dev/null; then
+        echo -e "${RED}Plymouth is not installed. Installing Plymouth...${NC}"
+        sudo pacman -Sy --noconfirm plymouth
+        echo -e "${GREEN}Plymouth has been installed.${NC}"
     else
-    # Check if the package is already installed
-    if pacman -Q "$package_name" &>/dev/null; then
-        echo -e "${GREEN}Custom theme ${NC}'${package_name}' ${GREEN}is already installed.${NC}"
-        custom_theme_installed=true
-        theme_changed=true
-    else
-    # Install the package using yay (it will install print "successfully installed" for whatever package the user inputs, no matter if it is not a valid package)
-        yay -Sy --noconfirm "$package_name"
-        echo -e "${GREEN}Custom theme '${package_name}' has been installed.${NC}"
-        custom_theme_installed=true
-        theme_changed=true
+        echo -e "${GREEN}Plymouth is already installed.${NC}"
     fi
-fi
-      ;;
-    *)
-      echo -e "${RED}Invalid choice. Please choose 1 or 2.${NC}"
-      return 1
-      ;;
-  esac
 
-  # Check and update /etc/kernel/cmdline if "splash" or "quiet" are not present
-  if ! grep -q "quiet" /etc/kernel/cmdline && ! grep -q "splash" /etc/kernel/cmdline; then
-    echo -e "${BLUE}Updating kernel command line parameters...${NC}"
-    sudo sed -i 's/$/ splash quiet/' /etc/kernel/cmdline
-    echo -e "${GREEN}Kernel parameters updated.${NC}"
-  else
-    echo -e "${GREEN}Kernel parameters already contain 'splash' or 'quiet'. No changes made.${NC}"
-  fi
+    # Ask if the user wants a default or custom theme
+    echo -e "${BLUE}Do you want to choose a default theme or a custom one from AUR?${NC}"
+    echo -e "1) Choose a default theme"
+    echo -e "2) Set a custom theme from AUR (requires a valid theme package input)"
+    echo -e "0) Skip"
+    read -p "Please choose an option (0-2): " choice
 
-  # Reinstall kernels to apply changes, only if a custom theme was installed or a default theme was successfully set
-  if [[ "$theme_changed" == true ]]; then
-    echo -e "${BLUE}Reinstalling kernels to apply changes...${NC}"
-    sudo reinstall-kernels
-    echo -e "${GREEN}Kernels reinstalled successfully.${NC}"
-    echo -e "${GREEN}Plymouth setup is complete. Please reboot your system to apply changes.${NC}"
-  else
-    echo -e "${RED}No theme changes were made, skipping kernel reinstallation...${NC}"
-  fi
+    local theme_changed=false
+
+    case "$choice" in
+        1)
+            echo -e "${BLUE}Listing available Plymouth themes:${NC}"
+            plymouth-set-default-theme -l
+
+            echo -e "${ORANGE}Enter the name of the Plymouth theme you want to set:${NC}"
+            read -r theme_name
+
+            if [[ -z "$theme_name" ]]; then
+                echo -e "${RED}No theme name entered. Skipping default theme setting...${NC}"
+            else
+                echo -e "${BLUE}Setting Plymouth theme to ${ORANGE}'$theme_name'${NC}..."
+                sudo plymouth-set-default-theme "$theme_name"
+
+                echo -e "${BLUE}Updating /etc/plymouth/plymouthd.conf...${NC}"
+                sudo sed -i "s/^#Theme=/Theme=$theme_name/" /etc/plymouth/plymouthd.conf
+                theme_changed=true
+            fi
+            ;;
+        2)
+            echo -e "${ORANGE}Enter the package name for the custom theme (e.g., plymouth-theme-endeavouros):${NC}"
+            read -r package_name
+
+            if [[ -z "$package_name" ]]; then
+                echo -e "${RED}No package name entered. Skipping custom theme installation...${NC}"
+            else
+                if pacman -Qq "$package_name" &>/dev/null; then
+                    echo -e "${GREEN}Custom theme ${NC}'${package_name}' ${GREEN}is already installed.${NC}"
+                else
+                    yay -Sy --noconfirm "$package_name"
+                    echo -e "${GREEN}Custom theme '${package_name}' has been installed.${NC}"
+                fi
+                theme_changed=true
+            fi
+            ;;
+        0)
+            echo "Skipping Plymouth setup..."
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Please choose 0, 1, or 2.${NC}"
+            return 1
+            ;;
+    esac
+
+    # Check and update kernel parameters for both bootloaders
+    if [ -f /etc/kernel/cmdline ]; then
+        if ! grep -q "quiet" /etc/kernel/cmdline || ! grep -q "splash" /etc/kernel/cmdline; then
+            echo -e "${BLUE}Updating kernel command line parameters...${NC}"
+            # Add only missing parameters
+            if ! grep -q "splash" /etc/kernel/cmdline; then
+                echo -n " splash" | sudo tee -a /etc/kernel/cmdline > /dev/null
+            fi
+            if ! grep -q "quiet" /etc/kernel/cmdline; then
+                echo -n " quiet" | sudo tee -a /etc/kernel/cmdline > /dev/null
+            fi
+            echo -e "${GREEN}Kernel parameters updated.${NC}"
+        else
+            echo -e "${GREEN}Kernel parameters already contain 'splash' and 'quiet'. No changes made.${NC}"
+        fi
+    elif [ -f /etc/default/grub ]; then
+        local grub_line
+        grub_line=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub)
+        if ! echo "$grub_line" | grep -q "splash" || ! echo "$grub_line" | grep -q "quiet"; then
+            echo -e "${BLUE}Updating GRUB kernel parameters...${NC}"
+            if ! echo "$grub_line" | grep -q "splash"; then
+                sudo sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/ s/"$/ splash"/' /etc/default/grub
+            fi
+            if ! echo "$grub_line" | grep -q "quiet"; then
+                sudo sed -i '/^GRUB_CMDLINE_LINUX_DEFAULT=/ s/"$/ quiet"/' /etc/default/grub
+            fi
+            sudo update-grub > /dev/null 2>&1
+            echo -e "${GREEN}GRUB parameters updated.${NC}"
+        else
+            echo -e "${GREEN}GRUB parameters already contain 'splash' and 'quiet'. No changes made.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}No known bootloader config found. Skipping kernel parameter update.${NC}"
+    fi
+
+    # Reinstall kernels to apply changes, only if a theme was changed
+    if [[ "$theme_changed" == true ]]; then
+        echo -e "${BLUE}Reinstalling kernels to apply changes...${NC}"
+        sudo reinstall-kernels
+        echo -e "${GREEN}Kernels reinstalled successfully.${NC}"
+        echo -e "${GREEN}Plymouth setup is complete. Please reboot your system to apply changes.${NC}"
+    else
+        echo -e "${RED}No theme changes were made, skipping kernel reinstallation...${NC}"
+    fi
 }
 
 check_and_install_yay() {
@@ -1677,8 +1436,6 @@ check_and_install_yay() {
         cd - || return 1
         rm -rf yay-bin
         echo "yay installation complete."
-   # else
-   #     echo "yay is already installed."
     fi
 }
 
@@ -1687,6 +1444,15 @@ check_and_install_yay() {
 main() {
     logo
     check_and_install_yay
+
+    # Configure nano syntax highlighting
+    echo "include /usr/share/nano/*.nanorc" > ~/.nanorc
+
+    # Set default Java version (if installed)
+    if pacman -Qq jdk21-openjdk > /dev/null 2>&1; then
+        sudo archlinux-java set java-21-openjdk
+    fi
+
     update_mirrorlist
     updatesys
     configure_chaotic_aur
@@ -1695,9 +1461,8 @@ main() {
     bootloader_customizer
     z_memory
     install_gui_store
-    gaming_dependencies
+    install_gaming_deps
     choose_driver_installation
-    configure_steam # finish this one
     install_firewall
     install_other_software
     install_prog_software
@@ -1712,12 +1477,5 @@ main() {
     enable_services
    # darkmode_on_root TODO: needs "konsave" into chaotic AUR
 }
-
-#set nowrap
-#set softwrap
-echo "include /usr/share/nano/*.nanorc" > ~/.nanorc
-
-#archlinux-java status
-sudo archlinux-java set java-17-openjdk
 
 main
