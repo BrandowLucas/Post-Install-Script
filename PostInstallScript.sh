@@ -2,15 +2,20 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="1.0.0"
+iteration="1.0.1"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
-flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest gemini-cli signal-desktop darkly-bin hmcl-beta-bin xorg-xeyes  # plasma-x11-session quickemu chatgpt-desktop-bin keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager signal-desktop jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass haguichi vesktop piper
+flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest signal-desktop darkly-bin hmcl-beta-bin drm-info # xorg-xkill plasma-x11-session quickemu keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass vesktop piper gemini-cli claude-code kilocode-cli-bin openai-codex-bin
+
+# xorg-xeyes (use kwin debug window instead)
+# haguichi (its most of the time unrealible to connect, use zerotier instead)
 )
 
 prog_packages=(
-python-pip zed cmake gdb strace sourcegit git-credential-manager github-cli maven jdk21-openjdk jdk8-openjdk recaf # helix intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
+python-pip cmake maven jdk21-openjdk jdk8-openjdk go rust valkey mongo
+sourcegit zed github-cli git-credential-manager recaf gdb strace
+# helix intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
 glfw glew extra-cmake-modules
 )
 
@@ -21,7 +26,7 @@ glfw glew extra-cmake-modules
 # git config --global user.name "BrandowLucas"
 
 pentest_packages=(
-wireshark-qt whois gnu-netcat nmap traceroute
+wireshark-qt whois gnu-netcat nmap mtr nmap bind bind-tools
 tcpdump macchanger scapy masscan arp-scan
 hping httptunnel httrack hashcat
 mhash aircrack-ng socat binwalk
@@ -143,6 +148,11 @@ user_groups=(
     zerotier-one  # for zerotier-gui to work
 )
 
+# Fix ZeroTier-Gui:
+# sudo chown -R root:zerotier-one /var/lib/zerotier-one
+# sudo chmod 660 /var/lib/zerotier-one/authtoken.secret
+# newgrp zerotier-one (this one only if u haven't rebooted after adding username to zerotier group, albeit it will only work the current shel so im not sure if this would work properly). Use "id" command to see if u are already on zerotier group
+
 # Custom repositories to configure in /etc/pacman.conf
 # Format: "name|mirrorlist_path|keyring_pkg|mirrorlist_pkg|key_id|keyserver|keyring_url|mirrorlist_url"
 # - mirrorlist_path: the actual path used in the pacman.conf Include directive
@@ -155,7 +165,7 @@ custom_repos=(
 )
 
 
---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 NC='\033[0m' # No Color
@@ -692,14 +702,262 @@ install_shell() {
             echo -e "fzf ${GREEN}is already installed.${NC}"
         fi
 
-        # Add fzf key bindings to .zshrc if not already present
-        if ! grep -q 'bindkey.*fzf-history-widget' "$ZSH_CONFIG_FILE"; then
+        # Install query-aware history ranking for Ctrl-R.
+        mkdir -p "$HOME/.local/bin"
+        cat << 'EOF' > "$HOME/.local/bin/zsh-history-candidates"
+#!/usr/bin/env python3
+import os
+import re
+import shlex
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+HISTORY_PATH = Path.home() / ".zsh_history"
+OPERATORS = {"&&", "||", "|", ";", "&"}
+
+
+@dataclass(frozen=True)
+class SearchTerm:
+    text: str
+    role_rank: int
+    source_rank: int
+
+
+def query_parts(query: str) -> list[str]:
+    return [part for part in re.findall(r"[a-z0-9]+", query.lower()) if part]
+
+
+def parts_in_order(parts: list[str], text: str) -> int | None:
+    search_start = 0
+    first_index: int | None = None
+    for part in parts:
+        index = text.find(part, search_start)
+        if index < 0:
+            return None
+        if first_index is None:
+            first_index = index
+        search_start = index + len(part)
+    return first_index
+
+
+def segment_start_index(text: str, query: str) -> int | None:
+    match = re.search(rf"(^|[^a-z0-9]){re.escape(query)}", text)
+    if match is None:
+        return None
+    return match.start() + (0 if match.group(1) == "" else 1)
+
+
+def is_assignment(token: str) -> bool:
+    return re.match(r"^[A-Za-z_][A-Za-z0-9_]*=.*$", token) is not None
+
+
+def is_url_like(token: str) -> bool:
+    return "://" in token or token.startswith("git@")
+
+
+def split_command(command: str) -> list[str]:
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        tokens = re.split(r"\s+", command.strip())
+    return [token.rstrip("\\").strip() for token in tokens if token.rstrip("\\").strip()]
+
+
+def primary_token_index(tokens: list[str]) -> int | None:
+    for index, token in enumerate(tokens):
+        if token in OPERATORS:
+            continue
+        if is_assignment(token):
+            continue
+        return index
+    return None
+
+
+def build_terms(command: str) -> list[SearchTerm]:
+    tokens = split_command(command)
+    primary_index = primary_token_index(tokens)
+    terms: list[SearchTerm] = []
+    seen: set[tuple[str, int, int]] = set()
+
+    for index, token in enumerate(tokens):
+        if token in OPERATORS:
+            continue
+
+        role_rank = 2
+        if primary_index is not None and index == primary_index:
+            role_rank = 0
+        elif "/" in token:
+            role_rank = 1
+
+        candidates = [(token.lower(), 1, role_rank)]
+        if "/" in token:
+            basename = os.path.basename(token).lower()
+            if basename:
+                basename_role = 2 if is_url_like(token) else 0
+                candidates.append((basename, 0, basename_role))
+
+        for text, source_rank, candidate_role in candidates:
+            key = (text, candidate_role, source_rank)
+            if key in seen:
+                continue
+            seen.add(key)
+            terms.append(SearchTerm(text=text, role_rank=candidate_role, source_rank=source_rank))
+
+    return terms
+
+
+def match_term(query: str, parts: list[str], term: SearchTerm) -> tuple[int, int, int, int, int] | None:
+    text = term.text
+
+    if text == query:
+        return (0, term.role_rank, 0, term.source_rank, len(text))
+
+    if text.startswith(query):
+        return (1, term.role_rank, 0, term.source_rank, len(text))
+
+    if "." in query and text.endswith(query):
+        return (2, term.role_rank, 0, term.source_rank, len(text))
+
+    segment_index = segment_start_index(text, query)
+    if segment_index is not None:
+        return (3, term.role_rank, segment_index, term.source_rank, len(text))
+
+    substring_index = text.find(query)
+    if substring_index >= 0:
+        return (4, term.role_rank, substring_index, term.source_rank, len(text))
+
+    ordered_index = parts_in_order(parts, text)
+    if ordered_index is not None:
+        return (5, term.role_rank, ordered_index, term.source_rank, len(text))
+
+    return None
+
+
+def command_rank(query: str, command: str, recency_index: int) -> tuple[int, int, int, int, int, int, int] | None:
+    if not query:
+        return (9, 9, 9, 9, 9, len(command), recency_index)
+
+    lowered_query = query.lower()
+    lowered_parts = query_parts(lowered_query)
+    best_match: tuple[int, int, int, int, int] | None = None
+
+    for term in build_terms(command):
+        match = match_term(lowered_query, lowered_parts, term)
+        if match is None:
+            continue
+        if best_match is None or match < best_match:
+            best_match = match
+
+    if best_match is None:
+        return None
+
+    return (best_match[0], best_match[1], best_match[2], best_match[3], recency_index, best_match[4], len(command))
+
+
+def load_unique_history() -> list[str]:
+    if not HISTORY_PATH.exists():
+        return []
+
+    with HISTORY_PATH.open("r", encoding="utf-8", errors="ignore") as history_file:
+        commands = []
+        for line in history_file:
+            parts = line.rstrip("\n").split(";", 1)
+            if len(parts) != 2:
+                continue
+            commands.append(parts[1])
+
+    unique_commands: list[str] = []
+    seen: set[str] = set()
+    for command in reversed(commands):
+        if command in seen:
+            continue
+        seen.add(command)
+        unique_commands.append(command)
+
+    return unique_commands
+
+
+def main() -> int:
+    query = (sys.argv[1] if len(sys.argv) > 1 else "").strip().lower()
+    history_commands = load_unique_history()
+
+    if not query:
+        for command in history_commands:
+            print(command)
+        return 0
+
+    ranked_commands: list[tuple[tuple[int, int, int, int, int, int, int], str]] = []
+    for recency_index, command in enumerate(history_commands):
+        rank = command_rank(query, command, recency_index)
+        if rank is None:
+            continue
+        ranked_commands.append((rank, command))
+
+    ranked_commands.sort()
+    for _, command in ranked_commands:
+        print(command)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+EOF
+        chmod +x "$HOME/.local/bin/zsh-history-candidates"
+
+        # Configure Ctrl-R history search with query-aware ranking.
+        sed -i '/^export FZF_DEFAULT_OPTS=/d' "$ZSH_CONFIG_FILE"
+        sed -i '/^export FZF_CTRL_R_OPTS=/d' "$ZSH_CONFIG_FILE"
+        sed -i '/^bindkey '\''\^R'\'' fzf-history-widget$/d' "$ZSH_CONFIG_FILE"
+        sed -i '/^bindkey '\''\^R'\'' customFzfHistoryWidget$/d' "$ZSH_CONFIG_FILE"
+        sed -i '/^zle -N customFzfHistoryWidget$/d' "$ZSH_CONFIG_FILE"
+        sed -i '/^customFzfHistoryWidget() {$/,/^}$/d' "$ZSH_CONFIG_FILE"
+
+        if ! grep -q '^source /usr/share/fzf/key-bindings.zsh$' "$ZSH_CONFIG_FILE"; then
             cat << 'EOF' >> "$ZSH_CONFIG_FILE"
-export FZF_DEFAULT_OPTS="--height 40% --reverse --border --preview 'echo {}' --bind 'ctrl-r:reload(history 1),ctrl-y:accept'"
-bindkey '^R' fzf-history-widget
 source /usr/share/fzf/key-bindings.zsh
 EOF
         fi
+
+        cat << 'EOF' >> "$ZSH_CONFIG_FILE"
+export FZF_CTRL_R_OPTS="--height 40% --reverse --border --bind 'ctrl-r:toggle-sort,ctrl-y:accept'"
+
+customFzfHistoryWidget() {
+    local selected=""
+    local query="$LBUFFER"
+    local -a fzfCmd
+    fzfCmd=(${(z)$(__fzfcmd)})
+    selected="$(
+        ~/.local/bin/zsh-history-candidates "$query" |
+            FZF_DEFAULT_OPTS='' \
+            FZF_DEFAULT_OPTS_FILE='' \
+            "${fzfCmd[@]}" \
+                --height 40% \
+                --reverse \
+                --border \
+                --no-sort \
+                --disabled \
+                --query="$query" \
+                --bind "start:reload:$HOME/.local/bin/zsh-history-candidates {q}" \
+                --bind "change:reload:$HOME/.local/bin/zsh-history-candidates {q} || true" \
+                --bind "ctrl-r:toggle-sort,ctrl-y:accept" \
+                --preview 'printf "%s\n" {}'
+    )"
+
+    local result=$?
+    if [[ -n "$selected" ]]; then
+        LBUFFER="$selected"
+    fi
+
+    zle reset-prompt
+    return $result
+}
+
+zle -N customFzfHistoryWidget
+bindkey '^R' customFzfHistoryWidget
+EOF
 
         # Add plugins to .zshrc if not already present
         if ! grep -q "plugins=(.*zsh-autosuggestions.*)" "$ZSH_CONFIG_FILE"; then
@@ -1259,6 +1517,8 @@ configure_printer() {
         echo -e "${GREEN}CUPS service has been enabled and started.${NC}"
 
         # Source of download for Epson: https://download.ebz.epson.net/dsc/search/01/search/
+    else
+        echo "Skipping printer configuration..."
     fi
 }
 
@@ -1459,6 +1719,7 @@ install_firewall() {
 }
 
 setup_plymouth() {
+    echo
     echo -e "${BLUE}Do you want to configure Plymouth boot splash?${NC}"
     echo -e "1) Choose a default theme"
     echo -e "2) Set a custom theme from AUR (requires a valid theme package input)"
@@ -1640,3 +1901,5 @@ main
 #add system measurement widgets
 #shortcuts:
 #redo = CTRL Y
+
+# TODO add my KeyringFix and Udev Patch script funcs
