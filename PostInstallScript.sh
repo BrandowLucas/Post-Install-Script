@@ -6,17 +6,22 @@ iteration="1.0.1"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
-flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest signal-desktop darkly-bin hmcl-beta-bin drm-info # xorg-xkill plasma-x11-session quickemu keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass vesktop piper gemini-cli claude-code kilocode-cli-bin openai-codex-bin
+flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest signal-desktop darkly-bin hmcl-beta-bin drm-info kdebugsettings losslesscut-bin tesseract tesseract-data-eng xorg-server-xvfb # xorg-xkill plasma-x11-session quickemu keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass vesktop piper gemini-cli claude-code kilo-bin opencode openai-codex-bin
 
 # xorg-xeyes (use kwin debug window instead)
 # haguichi (its most of the time unrealible to connect, use zerotier instead)
+
+# XFCE: xfce4 xfce4-goodies xfce4-clipman-plugin xfce4-taskmanager xfce4-pulseaudio-plugin gvfs-mtp gvfs-afc gvfs-smb udisks2 xfce4-screenshooter bluez bluez-utils blueman file-roller network-manager-applet
 )
 
 prog_packages=(
-python-pip cmake maven jdk21-openjdk jdk8-openjdk go rust valkey mongo
-sourcegit zed github-cli git-credential-manager recaf gdb strace
+python-pip cmake maven meson jdk21-openjdk jdk8-openjdk go rust valkey mongo
+sourcegit zed github-cli git-credential-manager recaf gdb strace ltrace
 # helix intellij-idea-community-edition #clion visual-studio-code-bin trash-cli github-desktop
-glfw glew extra-cmake-modules
+glfw glew extra-cmake-modules mingw-w64-gcc #opencl-headers
+cabextract innoextract-git #official innoextract package not enough (i had problems), use git 
+innounp-bin
+php #needed for ifpstools
 )
 
 # set: export GCM_CREDENTIAL_STORE=secretservice
@@ -26,10 +31,11 @@ glfw glew extra-cmake-modules
 # git config --global user.name "BrandowLucas"
 
 pentest_packages=(
-wireshark-qt whois gnu-netcat nmap mtr nmap bind bind-tools
+wireshark-qt whois gnu-netcat nmap mtr nmap bind bind-tools geoip doggo
 tcpdump macchanger scapy masscan arp-scan
 hping httptunnel httrack hashcat
-mhash aircrack-ng socat binwalk
+binwalk radare2 radare2-r2ghidra
+mhash aircrack-ng socat
 sleuthkit mitmproxy #maltego
 )
 
@@ -38,6 +44,7 @@ wine-staging winetricks lib32-vulkan-icd-loader vkbasalt lib32-vkbasalt
 mangohud-git lib32-mangohud-git goverlay-git gamemode lib32-gamemode lutris latencyflex-bin #
 heroic-games-launcher-bin ttf-arimo-nerd lib32-freetype2 freetype2
 lib32-alsa-plugins lib32-pipewire gamescope lib32-sdl sdl sdl2 lib32-sdl2 #bottles
+umu-launcher # (use proton via commandline)
 )
 
 remove_packages=(
@@ -53,7 +60,7 @@ flatpak_apps=(
     app/sh.ppy.osu/x86_64/stable                                        # Osu
     #app/org.telegram.desktop/x86_64/stable                             # Telegram
     app/io.github.dvlv.boxbuddyrs/x86_64/stable                         # BoxBuddy (distrobox frontend) # needs native podman installed
-    https://sober.vinegarhq.org/sober.flatpakref                        # Sober (Roblox android frontend)
+    app/org.vinegarhq.Sober/x86_64/stable                        # Sober (Roblox android frontend)
 )
 
 # Choose which services you want to enable
@@ -94,7 +101,6 @@ shell_config=(
     'alias fwinecfg="firejail --profile=/etc/firejail/wine.profile winecfg"'
     'alias fwine32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile wine"'
     'alias fwinecfg32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile winecfg"'
-
 )
 
 # ZRAM configuration (generator settings)
@@ -103,7 +109,7 @@ zram_config=(
     # On 6GB RAM, 100% is recommended for better multitasking.
     '[zram0]'
     'compression-algorithm = %ALGO%'
-    'zram-size = ram * 2'  # gives ~12GB zram
+    'zram-size = ram'
     'swap-priority = 100'
     'fs-type = swap'
 
@@ -165,8 +171,7 @@ custom_repos=(
 )
 
 
-# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
+### SOURCE CODE ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- SOURCE CODE ###
 
 NC='\033[0m' # No Color
 BOLD='\033[1m' # Bold
@@ -721,6 +726,7 @@ OPERATORS = {"&&", "||", "|", ";", "&"}
 @dataclass(frozen=True)
 class SearchTerm:
     text: str
+    raw_text: str
     role_rank: int
     source_rank: int
 
@@ -786,65 +792,86 @@ def build_terms(command: str) -> list[SearchTerm]:
             continue
 
         role_rank = 2
-        if primary_index is not None and index == primary_index:
+        if primary_index is not None and index < primary_index and is_assignment(token):
+            role_rank = 0
+        elif primary_index is not None and index == primary_index:
             role_rank = 0
         elif "/" in token:
             role_rank = 1
 
-        candidates = [(token.lower(), 1, role_rank)]
+        candidates = [(token.lower(), token, 1, role_rank)]
         if "/" in token:
-            basename = os.path.basename(token).lower()
+            basename_raw = os.path.basename(token)
+            basename = basename_raw.lower()
             if basename:
                 basename_role = 2 if is_url_like(token) else 0
-                candidates.append((basename, 0, basename_role))
+                candidates.append((basename, basename_raw, 0, basename_role))
 
-        for text, source_rank, candidate_role in candidates:
+        for text, raw_text, source_rank, candidate_role in candidates:
             key = (text, candidate_role, source_rank)
             if key in seen:
                 continue
             seen.add(key)
-            terms.append(SearchTerm(text=text, role_rank=candidate_role, source_rank=source_rank))
+            terms.append(SearchTerm(text=text, raw_text=raw_text, role_rank=candidate_role, source_rank=source_rank))
 
     return terms
 
 
-def match_term(query: str, parts: list[str], term: SearchTerm) -> tuple[int, int, int, int, int] | None:
+def match_term(query: str, parts: list[str], term: SearchTerm) -> tuple[int, int, int, int, int, int] | None:
     text = term.text
+    raw_text = term.raw_text
+    has_uppercase_query = any(character.isupper() for character in query)
+
+    if has_uppercase_query and raw_text == query:
+        return (0, 0, term.role_rank, 0, term.source_rank, len(text))
+
+    if has_uppercase_query and raw_text.startswith(query):
+        return (1, 0, term.role_rank, 0, term.source_rank, len(text))
+
+    if has_uppercase_query and "." in query and raw_text.endswith(query):
+        return (2, 0, term.role_rank, 0, term.source_rank, len(text))
+
+    raw_segment_index = segment_start_index(raw_text, query)
+    if has_uppercase_query and raw_segment_index is not None:
+        return (3, 0, term.role_rank, raw_segment_index, term.source_rank, len(text))
+
+    raw_substring_index = raw_text.find(query)
+    if has_uppercase_query and raw_substring_index >= 0:
+        return (4, 0, term.role_rank, raw_substring_index, term.source_rank, len(text))
 
     if text == query:
-        return (0, term.role_rank, 0, term.source_rank, len(text))
+        return (0, 1, term.role_rank, 0, term.source_rank, len(text))
 
     if text.startswith(query):
-        return (1, term.role_rank, 0, term.source_rank, len(text))
+        return (1, 1, term.role_rank, 0, term.source_rank, len(text))
 
     if "." in query and text.endswith(query):
-        return (2, term.role_rank, 0, term.source_rank, len(text))
+        return (2, 1, term.role_rank, 0, term.source_rank, len(text))
 
     segment_index = segment_start_index(text, query)
     if segment_index is not None:
-        return (3, term.role_rank, segment_index, term.source_rank, len(text))
+        return (3, 1, term.role_rank, segment_index, term.source_rank, len(text))
 
     substring_index = text.find(query)
     if substring_index >= 0:
-        return (4, term.role_rank, substring_index, term.source_rank, len(text))
+        return (4, 1, term.role_rank, substring_index, term.source_rank, len(text))
 
     ordered_index = parts_in_order(parts, text)
     if ordered_index is not None:
-        return (5, term.role_rank, ordered_index, term.source_rank, len(text))
+        return (5, 1, term.role_rank, ordered_index, term.source_rank, len(text))
 
     return None
 
 
-def command_rank(query: str, command: str, recency_index: int) -> tuple[int, int, int, int, int, int, int] | None:
+def command_rank(query: str, command: str, recency_index: int) -> tuple[int, int, int, int, int, int, int, int] | None:
     if not query:
         return (9, 9, 9, 9, 9, len(command), recency_index)
 
-    lowered_query = query.lower()
-    lowered_parts = query_parts(lowered_query)
-    best_match: tuple[int, int, int, int, int] | None = None
+    lowered_parts = query_parts(query)
+    best_match: tuple[int, int, int, int, int, int] | None = None
 
     for term in build_terms(command):
-        match = match_term(lowered_query, lowered_parts, term)
+        match = match_term(query, lowered_parts, term)
         if match is None:
             continue
         if best_match is None or match < best_match:
@@ -853,7 +880,7 @@ def command_rank(query: str, command: str, recency_index: int) -> tuple[int, int
     if best_match is None:
         return None
 
-    return (best_match[0], best_match[1], best_match[2], best_match[3], recency_index, best_match[4], len(command))
+    return (recency_index, best_match[0], best_match[1], best_match[2], best_match[3], best_match[4], best_match[5], len(command))
 
 
 def load_unique_history() -> list[str]:
@@ -880,7 +907,7 @@ def load_unique_history() -> list[str]:
 
 
 def main() -> int:
-    query = (sys.argv[1] if len(sys.argv) > 1 else "").strip().lower()
+    query = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
     history_commands = load_unique_history()
 
     if not query:
@@ -888,7 +915,7 @@ def main() -> int:
             print(command)
         return 0
 
-    ranked_commands: list[tuple[tuple[int, int, int, int, int, int, int], str]] = []
+    ranked_commands: list[tuple[tuple[int, int, int, int, int, int, int, int], str]] = []
     for recency_index, command in enumerate(history_commands):
         rank = command_rank(query, command, recency_index)
         if rank is None:
@@ -1021,6 +1048,21 @@ EOF
                 echo "$setting" >> "$FISH_CONFIG_FILE" || { echo "Failed to add setting to config.fish"; return 1; }
             fi
         done
+
+        # Configure Fish keybindings (Zsh-like Ctrl-C and Ctrl-Backspace component delete)
+        if ! grep -q "function fish_user_key_bindings" "$FISH_CONFIG_FILE"; then
+            cat << 'EOF' >> "$FISH_CONFIG_FILE"
+
+function fish_user_key_bindings
+    # Make Ctrl+C behave like Zsh (keep canceled command visible, print ^C, and start a new line)
+    bind \cc 'echo -n "^C"; echo; commandline ""; commandline -f repaint'
+
+    # Make Ctrl+Backspace delete path components (stopping at slashes, spaces, and punctuation)
+    bind ctrl-backspace backward-kill-path-component
+    bind ctrl-h backward-kill-path-component
+end
+EOF
+        fi
 
         # Configure Starship
         echo "Configuring Starship..."
