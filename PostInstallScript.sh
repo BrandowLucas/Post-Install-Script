@@ -103,6 +103,27 @@ shell_config=(
     'alias fwinecfg32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile winecfg"'
 )
 
+# Put ZSH-specific functions/bindings here
+read -r -d '' shell_func_config_zsh << 'EOF' || true
+# Example: custom ZSH functions/bindings can go here
+EOF
+
+# Put FISH-specific functions/bindings here
+read -r -d '' shell_func_config_fish << 'EOF' || true
+function fish_user_key_bindings
+    # Make Ctrl+C behave like Zsh (keep canceled command visible, print ^C, and start a new line)
+    bind \cc 'echo -n "^C"; echo; commandline ""; commandline -f repaint'
+
+    # Make Ctrl+Backspace delete path components (stopping at slashes, spaces, and punctuation)
+    bind ctrl-backspace backward-kill-path-component
+    bind ctrl-h backward-kill-path-component
+
+    # Make Ctrl+Left/Right move by path components (stopping at slashes, spaces, and punctuation)
+    bind ctrl-left backward-path-component
+    bind ctrl-right forward-path-component
+end
+EOF
+
 # ZRAM configuration (generator settings)
 zram_config=(
     # Use 'ram' for 100% or 'ram / 2' for 50%.
@@ -682,6 +703,14 @@ install_shell() {
             fi
         done
 
+        # Add shell_func_config_zsh to .zshrc
+        if [[ -n "$shell_func_config_zsh" ]]; then
+            if ! grep -q "# Added by Post-Install-Script (Zsh functions)" "$ZSH_CONFIG_FILE"; then
+                echo -e "\n# Added by Post-Install-Script (Zsh functions)" >> "$ZSH_CONFIG_FILE"
+                echo "$shell_func_config_zsh" >> "$ZSH_CONFIG_FILE"
+            fi
+        fi
+
         ZSH_AUTOSUGGESTIONS_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
         if [[ ! -d "$ZSH_AUTOSUGGESTIONS_DIR" ]]; then
             echo "Installing zsh-autosuggestions plugin..."
@@ -1049,19 +1078,11 @@ EOF
             fi
         done
 
-        # Configure Fish keybindings (Zsh-like Ctrl-C and Ctrl-Backspace component delete)
-        if ! grep -q "function fish_user_key_bindings" "$FISH_CONFIG_FILE"; then
-            cat << 'EOF' >> "$FISH_CONFIG_FILE"
-
-function fish_user_key_bindings
-    # Make Ctrl+C behave like Zsh (keep canceled command visible, print ^C, and start a new line)
-    bind \cc 'echo -n "^C"; echo; commandline ""; commandline -f repaint'
-
-    # Make Ctrl+Backspace delete path components (stopping at slashes, spaces, and punctuation)
-    bind ctrl-backspace backward-kill-path-component
-    bind ctrl-h backward-kill-path-component
-end
-EOF
+        # Add shell_func_config_fish to config.fish
+        if [[ -n "$shell_func_config_fish" ]]; then
+            if ! grep -q "function fish_user_key_bindings" "$FISH_CONFIG_FILE"; then
+                echo -e "\n$shell_func_config_fish" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Fish keybindings"; return 1; }
+            fi
         fi
 
         # Configure Starship
