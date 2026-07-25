@@ -108,9 +108,54 @@ read -r -d '' shell_func_config_zsh << 'EOF' || true
 # Example: custom ZSH functions/bindings can go here
 EOF
 
+# Open Bash temporarily for pasting Bash/Zsh-style commands
+read -r -d '' fish_bp_function << 'EOF' || true
+function bp --description 'Open Bash for pasting Bash commands'
+    bash
+end
+EOF
+
+# Detect Bash-only syntax before Fish parses the command entered by the user
+read -r -d '' fish_bash_enter_fallback_function << 'EOF' || true
+function __bash_fallback_execute
+    # Let Fish accept pager/search selections without applying or executing the Bash fallback
+    if commandline --paging-mode; or commandline --search-mode
+        commandline -f execute
+        return
+    end
+
+    set -l commandline_text (commandline | string collect)
+
+    if string match -rq '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' -- "$commandline_text"; or string match -rq '<\([^)]+\)' -- "$commandline_text"
+        if bash -n -c "$commandline_text"
+            set -l escaped_command (string escape -- "$commandline_text")
+            commandline --replace "bash -c $escaped_command"
+        end
+    end
+
+    commandline -f execute
+end
+EOF
+
+# Retry Bash-style variable-assignment commands in a temporary Bash process
+read -r -d '' fish_bash_fallback_function << 'EOF' || true
+function __bash_fallback --on-event fish_posterror
+    set -l commandline_text $argv[1]
+
+    if string match -rq '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' -- "$commandline_text"
+        if bash -n -c "$commandline_text"
+            bash -c "$commandline_text"
+        end
+    end
+end
+EOF
+
 # Put FISH-specific functions/bindings here
 read -r -d '' shell_func_config_fish << 'EOF' || true
 function fish_user_key_bindings
+    # Run recognized Bash syntax through a temporary Bash process before Fish parses it
+    bind enter __bash_fallback_execute
+
     # Make Ctrl+C behave like Zsh (keep canceled command visible, print ^C, and start a new line)
     bind \cc 'echo -n "^C"; echo; commandline ""; commandline -f repaint'
 
@@ -1078,11 +1123,31 @@ EOF
             fi
         done
 
+        # Add the Bash paste shortcut to config.fish
+        if ! grep -qF "function bp --description 'Open Bash for pasting Bash commands'" "$FISH_CONFIG_FILE"; then
+            echo -e "\n$fish_bp_function" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Fish Bash paste shortcut"; return 1; }
+        fi
+
+        # Add Enter-time Bash syntax detection to config.fish
+        if ! grep -qF "function __bash_fallback_execute" "$FISH_CONFIG_FILE"; then
+            echo -e "\n$fish_bash_enter_fallback_function" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Fish Bash syntax detection"; return 1; }
+        fi
+
+        # Add the automatic Bash syntax fallback to config.fish
+        if ! grep -qF "function __bash_fallback --on-event fish_posterror" "$FISH_CONFIG_FILE"; then
+            echo -e "\n$fish_bash_fallback_function" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Fish Bash syntax fallback"; return 1; }
+        fi
+
         # Add shell_func_config_fish to config.fish
         if [[ -n "$shell_func_config_fish" ]]; then
             if ! grep -q "function fish_user_key_bindings" "$FISH_CONFIG_FILE"; then
                 echo -e "\n$shell_func_config_fish" >> "$FISH_CONFIG_FILE" || { echo "Failed to configure Fish keybindings"; return 1; }
             fi
+        fi
+
+        # Add the Bash fallback binding to an existing fish_user_key_bindings function
+        if ! grep -qF "bind enter __bash_fallback_execute" "$FISH_CONFIG_FILE"; then
+            sed -i "/^function fish_user_key_bindings$/a\\    # Run recognized Bash syntax through a temporary Bash process before Fish parses it\\n    bind enter __bash_fallback_execute\\n" "$FISH_CONFIG_FILE" || { echo "Failed to bind Fish Bash syntax detection"; return 1; }
         fi
 
         # Configure Starship
