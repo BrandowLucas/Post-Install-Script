@@ -103,13 +103,20 @@ shell_config=(
     'alias la="eza -la"'
     'alias l="eza"'
     'alias ls="eza"'
+
     'alias nested="QT_QPA_PLATFORM=wayland dbus-launch -- kwin_wayland plasmashell"'
+
     'alias fwine="firejail --profile=/etc/firejail/wine.profile wine"'
     'alias fwinecfg="firejail --profile=/etc/firejail/wine.profile winecfg"'
-    'alias fwine32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile wine"'
-    'alias fwinecfg32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile winecfg"'
+
+    'alias killmc='\''sh -c "PID=\$(pgrep -f \"[l]wjgl3ify\" | tail -n 1); if [ -z \"\$PID\" ]; then PID=\$(pgrep -f \"[l]wjgl\" | tail -n 1); fi; if [ -n \"\$PID\" ]; then echo -e \"\033[32m[✓] Found process \$PID. Terminating...\033[0m\"; kill -9 \"\$PID\"; else echo -e \"\033[31m[✕] No Minecraft-related process found.\033[0m\"; fi"'\'''
+
+    'alias topmem='\''ps -eo size,pid,user,command | sh -c "read -r h; echo \"\$h\"; sort -k1,1 -nr" | head -n 11 | numfmt --header --field=1 --from-unit=K --to=iec | awk "NR==1 {print \"\033[1;37m\" \$0 \"\033[0m\"} NR>1 {printf \"\033[1;32m%8s\033[0m \033[1;34m%-6s\033[0m \033[1;33m%-8s\033[0m %s\n\", \$1, \$2, \$3, \$4}"'\'''
+    'alias killtop='\''kill -9 $(ps -eo size,pid | sort -k1,1 -nr | head -n 1 | awk "{print \$2}")'\'''
+
     'alias myip="echo -e \"IPv4: \$(curl -s -4 icanhazip.com)\nIPv6: \$(curl -s -6 icanhazip.com)\" && curl -s http://ip-api.com/json/ | jq '\''{isp, org, city, regionName, country, zip, timezone, lat, lon}'\''"'
     'alias newip="nmcli connection down wgcf-profile 2>/dev/null; nmcli connection delete wgcf-profile 2>/dev/null; rm -f wgcf-account.toml wgcf-profile.conf && wgcf register --accept-tos && wgcf generate && nmcli connection import type wireguard file wgcf-profile.conf && nmcli connection up wgcf-profile"'
+
 )
 
 # Put ZSH-specific functions/bindings here
