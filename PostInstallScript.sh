@@ -2,14 +2,21 @@
 
 # SCRIPT MADE BY STRIKER -> github.com/BrandowLucas
 
-iteration="1.0.1"
+iteration="1.0.2"
 
 # MODIFY YOUR PACKAGES HERE !!!
 packages=(
-flatpak dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest signal-desktop darkly-bin hmcl-beta-bin drm-info kdebugsettings losslesscut-bin tesseract tesseract-data-eng xorg-server-xvfb # xorg-xkill plasma-x11-session quickemu keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass vesktop piper gemini-cli claude-code kilo-bin opencode openai-codex-bin
+flatpak shared-mime-info dolphin-plugins p7zip unzip zenity qbittorrent htop ncdu dhclient corectrl firejail flatpak-kcm protontricks inotify-tools fast eog discord system-monitoring-center hardinfo debtap webapp-manager zerotier-one zerotier-gui-git distrobox podman q4wine-git yt-dlp obs-studio hunspell-en_us klassy brave eza lunar-client kio-admin gpu-screen-recorder-ui mission-center lshw qemu-desktop virt-manager protonplus libinput-tools evtest signal-desktop darkly-bin hmcl-beta-bin drm-info kdebugsettings losslesscut-bin cloudflare-warp-bin wgcf tesseract tesseract-data-eng xorg-server-xvfb # xorg-xkill plasma-x11-session quickemu keepassxc notion-app-electron detect-it-easy-bin telegram-desktop obsidian kwalletmanager jackett orca lightly-qt session-desktop-bin swapspace kwin-effect-rounded-corners-git proton-vpn-gtk-app mongodb-compass vesktop piper gemini-cli claude-code kilo-bin opencode openai-codex-bin
 
 # xorg-xeyes (use kwin debug window instead)
 # haguichi (its most of the time unrealible to connect, use zerotier instead)
+
+# wgcf register && wgcf generate && nmcli connection import type wireguard file wgcf-profile.conf
+#
+# For NEW IP:
+#
+# nmcli connection down wgcf-profile 2>/dev/null; nmcli connection delete wgcf-profile 2>/dev/null; rm -f wgcf-account.toml wgcf-profile.conf && wgcf register --accept-tos && wgcf generate && nmcli connection import type wireguard file wgcf-profile.conf && nmcli connection up wgcf-profile
+
 
 # XFCE: xfce4 xfce4-goodies xfce4-clipman-plugin xfce4-taskmanager xfce4-pulseaudio-plugin gvfs-mtp gvfs-afc gvfs-smb udisks2 xfce4-screenshooter bluez bluez-utils blueman file-roller network-manager-applet
 )
@@ -31,7 +38,7 @@ php #needed for ifpstools
 # git config --global user.name "BrandowLucas"
 
 pentest_packages=(
-wireshark-qt whois gnu-netcat nmap mtr nmap bind bind-tools geoip doggo
+wireshark-qt whois gnu-netcat nmap mtr nmap bind bind-tools geoip doggo zaproxy
 tcpdump macchanger scapy masscan arp-scan
 hping httptunnel httrack hashcat
 binwalk radare2 radare2-r2ghidra
@@ -101,6 +108,8 @@ shell_config=(
     'alias fwinecfg="firejail --profile=/etc/firejail/wine.profile winecfg"'
     'alias fwine32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile wine"'
     'alias fwinecfg32="WINEARCH=win32 WINEPREFIX=~/.wine32 firejail --profile=/etc/firejail/wine32.profile winecfg"'
+    'alias myip="echo -e \"IPv4: \$(curl -s -4 icanhazip.com)\nIPv6: \$(curl -s -6 icanhazip.com)\" && curl -s http://ip-api.com/json/ | jq '\''{isp, org, city, regionName, country, zip, timezone, lat, lon}'\''"'
+    'alias newip="nmcli connection down wgcf-profile 2>/dev/null; nmcli connection delete wgcf-profile 2>/dev/null; rm -f wgcf-account.toml wgcf-profile.conf && wgcf register --accept-tos && wgcf generate && nmcli connection import type wireguard file wgcf-profile.conf && nmcli connection up wgcf-profile"'
 )
 
 # Put ZSH-specific functions/bindings here
