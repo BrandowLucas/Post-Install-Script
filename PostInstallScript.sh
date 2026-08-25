@@ -147,12 +147,12 @@ function __bash_fallback_execute
 
     if string match -rq '<\([^)]+\)' -- "$commandline_text"
         set use_bash 1
-    else if string match -rq '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' -- "$commandline_text"; and not fish -n -c "$commandline_text" 2>/dev/null
+    else if not fish -n -c "$commandline_text" 2>/dev/null
         set use_bash 1
     end
 
     if test "$use_bash" -eq 1
-        if bash -n -c "$commandline_text"
+        if bash -n -c "$commandline_text" 2>/dev/null
             set -l escaped_command (string escape -- "$commandline_text")
             commandline --replace "bash -c $escaped_command"
         end
